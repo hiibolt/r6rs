@@ -26,6 +26,8 @@ use serde_json::{Value};
 use serenity::async_trait;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
+use serenity::builder::{CreateEmbed, CreateMessage};
+use serenity::model::id::ChannelId;
 use serenity::prelude::*;
 
 #[derive(Debug)]
@@ -35,9 +37,42 @@ struct State {
     market_data: Value
 }
 
-#[derive(Debug)]
-struct Bot {
-    state: Mutex<State>
+async fn econ( ctx: Context, msg: Message, args: VecDeque<String> ) {
+    todo!();
+}
+async fn stats( ctx: Context, msg: Message, args: VecDeque<String> ) {
+    todo!();
+}
+async fn opsec( ctx: Context, msg: Message, mut args: VecDeque<String> ) {
+    match args
+        .pop_front()
+        .unwrap_or(String::from("help"))
+        .as_str()
+    {
+        "linked" => {
+            let embed = CreateEmbed::new()
+                .title("This is an embed")
+                .description("With a description")
+                .image("https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4");
+            let builder = CreateMessage::new().tts(true).embed(embed);
+
+            let output = opsec::linked( &ctx, &msg, args ).await.unwrap();
+
+            if let Err(why) = msg.channel_id.send_message(&ctx.http, builder).await {
+                println!("Error sending message: {why:?}");
+            }
+        },
+        _ => todo!()
+    }
+}
+async fn bans( ctx: Context, msg: Message, args: VecDeque<String> ) {
+    todo!();
+}
+async fn admin( ctx: Context, msg: Message, args: VecDeque<String> ) {
+    todo!();
+}
+async fn help( ctx: Context, msg: Message, args: VecDeque<String> ) {
+    todo!();
 }
 
 #[async_trait]
