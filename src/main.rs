@@ -1,3 +1,8 @@
+mod opsec;
+mod admin;
+mod stats;
+mod bans;
+
 use std::{
     env,
     collections::{ VecDeque }
@@ -16,8 +21,21 @@ async fn econ( ctx: Context, msg: Message, args: VecDeque<String> ) {
 async fn stats( ctx: Context, msg: Message, args: VecDeque<String> ) {
     todo!();
 }
-async fn opsec( ctx: Context, msg: Message, args: VecDeque<String> ) {
-    todo!();
+async fn opsec( ctx: Context, msg: Message, mut args: VecDeque<String> ) {
+    match args
+        .pop_front()
+        .unwrap_or(String::from("help"))
+        .as_str()
+    {
+        "linked" => {
+            let output = opsec::linked( &ctx, &msg, args ).await.unwrap();
+
+            if let Err(why) = msg.channel_id.say(&ctx.http, &output).await {
+                println!("Error sending message: {why:?}");
+            }
+        },
+        _ => todo!()
+    }
 }
 async fn bans( ctx: Context, msg: Message, args: VecDeque<String> ) {
     todo!();
