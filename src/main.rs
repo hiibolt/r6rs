@@ -2,6 +2,16 @@ mod opsec;
 mod admin;
 mod bans;
 mod econ;
+mod help;
+mod lib;
+
+use crate::{
+    econ::econ,
+    opsec::opsec,
+    bans::bans,
+    admin::admin,
+    help::help
+};
 
 use std::{
     env,
@@ -9,13 +19,14 @@ use std::{
     fs::read_to_string
 };
 
+use lib::{ no_access, unimplemented, send_embed };
+
 use tokio::sync::Mutex;
 use serde_json::{Value};
 use serenity::async_trait;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
-use serenity::all::{ CreateEmbed, CreateMessage };
 
 #[derive(Debug)]
 struct State {
@@ -27,124 +38,6 @@ struct State {
 #[derive(Debug)]
 struct Bot {
     state: Mutex<State>
-}
-
-async fn send_embed( ctx: Context, msg: Message, title: &str, description: &str, url: &str ) -> Result<(), String> {
-    let embed = CreateEmbed::new()
-    .title(title)
-    .description(description)
-    .thumbnail(url);
-    
-    let builder = CreateMessage::new().tts(true).embed(embed);
-
-    msg.channel_id.send_message(&ctx.http, builder).await.map_err(|e| format!("{e:?}"))?;
-
-    Ok(())
-}
-async fn unimplemented( ctx: Context, msg: Message, cmd: &str ) {
-    send_embed(
-        ctx, 
-        msg, 
-        "Not yet implemented!", 
-        &format!("The command **{cmd}** exists but is not yet implemented! While I work, stay cozy :3"), 
-        "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
-    ).await
-        .unwrap();
-}
-async fn no_access( ctx: Context, msg: Message, cmd: &str, id: u64 ) {
-    send_embed(
-        ctx, 
-        msg, 
-        "You don't have access to this command!", 
-        &format!("You (**@{id}**) aren't authorized to use **{cmd}**.\n\n*Contact @hiibolt to purchase access or if this is in error.*"), 
-        "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
-    ).await
-        .unwrap();
-}
-
-async fn econ( ctx: Context, msg: Message, _args: VecDeque<String> ) {
-    unimplemented( ctx, msg, "econ" ).await;
-}
-async fn opsec( ctx: Context, msg: Message, mut args: VecDeque<String> ) {
-    match args
-        .pop_front()
-        .unwrap_or(String::from("help"))
-        .as_str()
-    {
-        "linked" => {
-            unimplemented( ctx, msg, "linked" ).await;
-        },
-        "help" => {
-            unimplemented( ctx, msg, "help" ).await;
-        },
-        nonexistant => {
-            send_embed(
-                ctx, 
-                msg, 
-                "Command does not exist", 
-                &format!("The command **{nonexistant}** is not valid!"), 
-                "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
-            ).await
-                .unwrap();
-        }
-    }
-}
-async fn bans( ctx: Context, msg: Message, mut args: VecDeque<String> ) {
-    match args
-        .pop_front()
-        .unwrap_or(String::from("help"))
-        .as_str()
-    {
-        "recent" => {
-            unimplemented( ctx, msg, "recent" ).await;
-        },
-        "watch" => {
-            unimplemented( ctx, msg, "watch" ).await;
-        },
-        "unwatch" => {
-            unimplemented( ctx, msg, "unwatch" ).await;
-        },
-        "watchlist" => {
-            unimplemented( ctx, msg, "unwatch" ).await;
-        },
-        nonexistant => {
-            send_embed(
-                ctx, 
-                msg, 
-                "Command does not exist", 
-                &format!("The command **{nonexistant}** is not valid!\n\n**Valid commands**:\nrecent\nwatch\nunwatch\nwatchlist"), 
-                "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
-            ).await
-                .unwrap();
-        }
-    }
-}
-async fn admin( ctx: Context, msg: Message, mut args: VecDeque<String> ) {
-    match args
-        .pop_front()
-        .unwrap_or(String::from("help"))
-        .as_str()
-    {
-        "whitelist" => {
-            unimplemented( ctx, msg, "whitelist" ).await; 
-        },
-        "blacklist" => {
-            unimplemented( ctx, msg, "blacklist" ).await;
-        },
-        nonexistant => {
-            send_embed(
-                ctx, 
-                msg, 
-                "Command does not exist", 
-                &format!("The command **{nonexistant}** is not valid!\n\n**Valid commands**:\nrecent\nwatch\nunwatch\nwatchlist"), 
-                "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
-            ).await
-                .unwrap();
-        }
-    }
-}
-async fn help( ctx: Context, msg: Message, _args: VecDeque<String> ) {
-    unimplemented( ctx, msg, "help" ).await;
 }
 
 #[async_trait]
@@ -160,7 +53,6 @@ impl EventHandler for Bot {
         if args.pop_front() != Some(String::from("r6")) {
             return;
         }
-
 
         match args
             .pop_front()
