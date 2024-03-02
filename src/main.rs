@@ -30,11 +30,12 @@ use serenity::model::gateway::Ready;
 use serenity::builder::{CreateEmbed, CreateMessage};
 use serenity::model::id::ChannelId;
 use serenity::prelude::*;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 struct State {
     bot_data: Value,
-    id_list: Value,
+    id_list: HashMap<String, String>,
     market_data: Value
 }
 
