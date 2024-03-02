@@ -16,7 +16,8 @@ use crate::{
 use std::{
     env,
     collections::{ VecDeque },
-    fs::read_to_string
+    fs::read_to_string,
+    sync::Arc
 };
 
 use lib::{ no_access, unimplemented, send_embed };
@@ -37,42 +38,9 @@ struct State {
     market_data: Value
 }
 
-async fn econ( ctx: Context, msg: Message, args: VecDeque<String> ) {
-    todo!();
-}
-async fn stats( ctx: Context, msg: Message, args: VecDeque<String> ) {
-    todo!();
-}
-async fn opsec( ctx: Context, msg: Message, mut args: VecDeque<String> ) {
-    match args
-        .pop_front()
-        .unwrap_or(String::from("help"))
-        .as_str()
-    {
-        "linked" => {
-            let embed = CreateEmbed::new()
-                .title("This is an embed")
-                .description("With a description")
-                .image("https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4");
-            let builder = CreateMessage::new().tts(true).embed(embed);
-
-            let output = opsec::linked( &ctx, &msg, args ).await.unwrap();
-
-            if let Err(why) = msg.channel_id.send_message(&ctx.http, builder).await {
-                println!("Error sending message: {why:?}");
-            }
-        },
-        _ => todo!()
-    }
-}
-async fn bans( ctx: Context, msg: Message, args: VecDeque<String> ) {
-    todo!();
-}
-async fn admin( ctx: Context, msg: Message, args: VecDeque<String> ) {
-    todo!();
-}
-async fn help( ctx: Context, msg: Message, args: VecDeque<String> ) {
-    todo!();
+#[derive(Debug)]
+struct Bot {
+    state: Arc<Mutex<State>>
 }
 
 #[async_trait]
@@ -108,7 +76,7 @@ impl EventHandler for Bot {
                 }
 
                 // Otherwise, go ahead
-                tokio::spawn(econ(ctx, msg, args));
+                tokio::spawn(econ(self.state.clone(), ctx, msg, args));
             },
             "opsec" => {
                 // Check if they're not on the whitelist
@@ -189,7 +157,7 @@ async fn main() {
         .expect("Could not find 'assets/market_data.json', please ensure you have created one!");
     
     // Build the state into an async mutex
-    let state = Mutex::new(
+    let state = Arc::new(Mutex::new(
         State {
             bot_data: serde_json::from_str(&bot_data_contents)
                 .expect("Could not parse the contents of 'bot_data.json'!"),
@@ -198,7 +166,7 @@ async fn main() {
             market_data: serde_json::from_str(&market_data_contents)
                 .expect("Could not parse the contents of 'market_data.json'!"),
         }
-    );
+    ));
 
     // Build client with state
     let mut client =
