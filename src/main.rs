@@ -3,14 +3,17 @@ mod admin;
 mod bans;
 mod econ;
 mod help;
-mod lib;
+mod helper;
+mod auth;
 
 use crate::{
     econ::econ,
     opsec::opsec,
     bans::bans,
     admin::admin,
-    help::help
+    help::help,
+    helper::{ no_access, unimplemented, send_embed },
+    auth::UbisoftAPI
 };
 
 use std::{
@@ -19,8 +22,6 @@ use std::{
     fs::read_to_string,
     sync::Arc
 };
-
-use lib::{ no_access, unimplemented, send_embed };
 
 use tokio::sync::Mutex;
 use serde_json::{Value};
@@ -41,7 +42,8 @@ struct State {
 
 #[derive(Debug)]
 struct Bot {
-    state: Arc<Mutex<State>>
+    ubisoft_api: Arc<Mutex<UbisoftAPI>>,
+    state:       Arc<Mutex<State>>
 }
 
 #[async_trait]
@@ -93,7 +95,7 @@ impl EventHandler for Bot {
                 }
 
                 // Otherwise, go ahead
-                tokio::spawn(opsec(ctx, msg, args)); 
+                tokio::spawn(opsec(self.ubisoft_api.clone(), self.state.clone(), ctx, msg, args)); 
             },
             "bans" => {
                 // Check if they're not on the whitelist
@@ -169,10 +171,27 @@ async fn main() {
         }
     ));
 
+    // Build the Ubisoft API and log in
+    let ubisoft_api = Arc::new(
+        Mutex::new(
+            UbisoftAPI::new(
+                env::var("UBISOFT_AUTH_EMAIL")
+                    .expect("Could not find UBISOFT_AUTH_EMAIL in the environment!"),
+                env::var("UBISOFT_AUTH_PW")
+                    .expect("Could not find UBISOFT_AUTH_PW in the environment!")
+            )
+        )
+    );
+    ubisoft_api
+        .lock().await
+        .login().await
+        .expect("Failed to login!");
+
     // Build client with state
     let mut client =
         Client::builder(&token, intents)
         .event_handler(Bot {
+            ubisoft_api,
             state
         })
         .await.expect("Err creating client");

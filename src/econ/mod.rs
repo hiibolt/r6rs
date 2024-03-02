@@ -15,9 +15,9 @@ async fn list( state: Arc<Mutex<State>> ) -> String {
     );
     
     let mut count: u8 = 0;
-    for (key, value) in  state.lock().await.id_list.iter() {
+    for (key, _) in  state.lock().await.id_list.iter() {
         // Break if we're potentially reaching Discord Embed's max length
-        if ( count > 99 ){
+        if count > 99 {
             msg += "...plus many others!";
             break;
         }

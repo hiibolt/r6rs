@@ -13,7 +13,8 @@
       in
       {
         devShell = pkgs.mkShell {
-          buildInputs = with pkgs; [ cargo rustc rustfmt rust-analyzer clippy ];
+          nativeBuildInputs = with pkgs; [ openssl.dev pkg-config ];
+          buildInputs = with pkgs; [ cargo rustc rustfmt rust-analyzer clippy  ];
           shellHook = 
             ''
             '';
