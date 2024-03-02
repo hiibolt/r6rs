@@ -83,4 +83,25 @@ impl UbisoftAPI {
 
         Ok(serde_json::from_str(&response.text().await?)?)
     }
+    pub async fn get_account_id ( &mut self, account_id: String ) -> Option<String> {
+        if account_id.len() < 20 {
+            let result = self
+                .basic_request(
+                    format!("https://public-ubiservices.ubi.com/v3/profiles?nameOnPlatform={}&platformType=uplay", account_id)
+                ).await.expect("todo!();");
+                
+            return result.get("profiles")
+                .and_then(|val| {
+                    val.get(0)
+                        .and_then(|val| {
+                            val.get("idOnPlatform")
+                                .and_then(|val| {
+                                    val.as_str()
+                                        .and_then(|st| Some(String::from(st)))
+                                })
+                        })
+                });
+        }
+        Some(account_id)
+    }
 }

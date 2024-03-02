@@ -36,42 +36,27 @@ async fn linked(
     let mut account_id = input_option
         .expect("Unreachable");
 
-    if account_id.len() < 20 {
-        let result = ubisoft_api
+    match 
+        ubisoft_api
             .lock().await
-            .basic_request(
-                format!("https://public-ubiservices.ubi.com/v3/profiles?nameOnPlatform={}&platformType=uplay", account_id)
-            ).await.expect("todo!();");
-            
-        match 
-            result.get("profiles")
-                .and_then(|val| {
-                    val.get(0)
-                        .and_then(|val| {
-                            val.get("idOnPlatform")
-                                .and_then(|val| {
-                                    val.as_str()
-                                })
-                        })
-                }) 
-        {
-            Some(id) => {
-                account_id = String::from(id);
-            }
-            None => {
-                body += &format!("Account **{account_id}** does not exist! Is it a PC ID?");
+            .get_account_id(account_id.clone()).await
+    {
+        Some(id) => {
+            account_id = String::from(id);
+        }
+        None => {
+            body += &format!("Account **{account_id}** does not exist! Is it a PC ID?");
 
-                send_embed(
-                    ctx, 
-                    msg, 
-                    title, 
-                    &body, 
-                    "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
-                ).await
-                    .unwrap();
+            send_embed(
+                ctx, 
+                msg, 
+                title, 
+                &body, 
+                "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+            ).await
+                .unwrap();
 
-                return;
-            }
+            return;
         }
     }
     
