@@ -982,6 +982,8 @@ dependencies = [
  "serde_json",
  "serenity",
  "tokio",
+ "tungstenite",
+ "url",
 ]
 
 [[package]]
@@ -1680,6 +1682,7 @@ dependencies = [
  "http 1.0.0",
  "httparse",
  "log",
+ "native-tls",
  "rand",
  "rustls 0.22.2",
  "rustls-pki-types",

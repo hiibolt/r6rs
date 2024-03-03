@@ -45,6 +45,7 @@ impl UbisoftAPI {
         self.headers.insert("Content-Type", "application/json; charset=UTF-8".parse()?);
         self.headers.insert("Ubi-AppId", "e3d5ea9e-50bd-43b7-88bf-39794f4e3d40".parse()?);
         self.headers.insert("Ubi-LocaleCode", "en-us".parse()?);
+        
 
         let request = client.post("https://public-ubiservices.ubi.com/v2/profiles/sessions")
             .headers(self.headers.clone())
@@ -58,9 +59,9 @@ impl UbisoftAPI {
             StatusCode::OK => {
                 let response_json: Value = serde_json::from_str(&response.text().await?)?;
 
-                *(self.headers.get_mut("Authorization")
-                    .ok_or("Unreachable")?) = format!("Ubi_v1 t={}", response_json["ticket"].as_str().ok_or("Ticket missing from Ubi response!")?).parse()?;
-        
+                self.headers.insert("Authorization", format!("Ubi_v1 t={}", response_json["ticket"].as_str().ok_or("Ticket missing from Ubi response!")?).parse()?);
+                self.headers.insert("Ubi-SessionId", response_json["sessionId"].as_str().ok_or("Ticket missing from Ubi response!")?.parse()?);
+    
                 println!("Successfully authenticated!");
             },
             _ => {
@@ -77,18 +78,27 @@ impl UbisoftAPI {
         let request = client.get(&url)
             .headers(self.headers.clone());
         
-        let response = request
-            .send()
-            .await?;
-
-        Ok(serde_json::from_str(&response.text().await?)?)
+        match 
+            request
+                .send()
+                .await?
+                .error_for_status() 
+        {
+            Ok(response) => {
+                Ok(serde_json::from_str(&response.text().await?)?)
+            },
+            Err(err) => {
+                println!("Request to {url} may have failed for reason {err}");
+                Err(Box::new(err))
+            }
+        }
     }
     pub async fn get_account_id ( &mut self, account_id: String ) -> Option<String> {
         if account_id.len() < 20 {
             let result = self
                 .basic_request(
                     format!("https://public-ubiservices.ubi.com/v3/profiles?nameOnPlatform={}&platformType=uplay", account_id)
-                ).await.expect("todo!();");
+                ).await.ok()?;
                 
             return result.get("profiles")
                 .and_then(|val| {

@@ -10,11 +10,26 @@
         pkgs = import nixpkgs {
           inherit system;
         };
+        python-package-list = p: with p; [
+          pip
+          pandas
+          numpy
+          certifi
+          colorama
+          pysocks
+          requests
+          requests-futures
+          stem
+          torrequest
+          openpyxl
+          exrex
+        ];
+        python = pkgs.python311.withPackages python-package-list;
       in
       {
         devShell = pkgs.mkShell {
           nativeBuildInputs = with pkgs; [ openssl.dev pkg-config ];
-          buildInputs = with pkgs; [ cargo rustc rustfmt rust-analyzer clippy  ];
+          buildInputs = with pkgs; [ cargo rustc rustfmt rust-analyzer clippy python ];
           shellHook = 
             ''
             '';
