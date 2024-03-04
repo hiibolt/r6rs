@@ -9,6 +9,10 @@ use crate::Value;
 use crate::{ Arc, Mutex };
 use tungstenite::{connect};
 use url::Url;
+use std::process::{Command, Stdio};
+use std::path::Path;
+use std::io::{BufReader, BufRead};
+
 
 async fn get_profiles( ubisoft_api: Arc<Mutex<UbisoftAPI>>, account_id: &str ) -> Option<Vec<Value>> {
     let profiles: Value = ubisoft_api
@@ -16,13 +20,17 @@ async fn get_profiles( ubisoft_api: Arc<Mutex<UbisoftAPI>>, account_id: &str ) -
         .basic_request(format!("https://public-ubiservices.ubi.com/v3/users/{account_id}/profiles"))
         .await.ok()?;
     
-    println!("{:?}", profiles.get("profiles"));
-    
     Some(profiles.get("profiles")?
         .as_array()?.clone())
 }
 async fn get_and_stringify_potential_profiles( usernames: &Vec<String>, body: &mut String ) {
     let invalid_characters: [char; 4] = [' ', '.', '-', '_'];
+    let invalid_sites: [&str; 15] = [
+        "Oracle", "8tracks", "Coders Rank", "Fiverr",
+        "HackerNews", "Modelhub", "metacritic", "xHamster",
+        "CNET", "YandexMusic", "HackerEarth", "OpenStreetMap", 
+        "Pinkbike", "Slides", "Strava"
+    ];
     
     let valid_usernames: Vec<String> = usernames
         .iter()
@@ -39,18 +47,33 @@ async fn get_and_stringify_potential_profiles( usernames: &Vec<String>, body: &m
         .map(|st| st.clone())
         .collect();
 
-    let (mut socket, _) = connect(Url::parse("wss://echo.websocket.in").unwrap()).expect("Can't connect");
-
-    println!("Connected to the server");
-    loop {
-        let msg = socket.read().expect("Error reading message");
-        println!("Received: {}", msg);
+    // Query Sherlock
+    for username in &valid_usernames {
+        let mut cmd = Command::new("python")
+            .arg("sherlock/sherlock")
+            .arg(&format!("{username}"))
+            .arg("--nsfw")
+            .stdout(Stdio::piped())
+            .spawn()
+            .expect("Issue running the Sherlock command! Did you install with Nix?");
+        {
+            let stdout = cmd.stdout.as_mut().unwrap();
+            let stdout_reader = BufReader::new(stdout);
+            let stdout_lines = stdout_reader.lines();
+    
+            for line in stdout_lines {
+                let output = line.unwrap_or(String::from(""));
+                if invalid_sites
+                        .iter()
+                        .any(|site| output.contains(site))
+                {
+                    continue;
+                }
+                *body += &format!("\n{}", output);
+            }
+        }
+        cmd.wait().unwrap();
     }
-    // socket.close(None);
-    
-    
-    println!("{:?}", valid_usernames)
-
 } 
 fn stringify_profiles( profiles: &Vec<Value>, usernames: &mut Vec<String>, body: &mut String, account_id: &String ) {
     for profile in profiles {
@@ -58,6 +81,7 @@ fn stringify_profiles( profiles: &Vec<Value>, usernames: &mut Vec<String>, body:
             .as_str()
             .unwrap_or("");
         usernames.push(String::from(username));
+        println!("Querying Sherlock for '{username}'...");
         match profile["platformType"].as_str() {
             Some("uplay") => {
                 *body += &format!("### Uplay:\n- {} ({})\n- https://r6.tracker.network/r6/search?name={account_id}&platform=4\n",
