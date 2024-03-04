@@ -8,47 +8,50 @@ use tokio::time::{ sleep, Duration };
 use serenity::all::EditMessage;
 use serenity::all::{ CreateEmbed, CreateMessage };
 
+pub async fn save( state: Arc<Mutex<State>> ) {
+    let bot_data_serialized = &state
+        .lock().await
+        .bot_data
+        .to_string();
+    let id_list_serialized = serde_json::to_string(&state
+        .lock().await
+        .id_list)
+        .expect("Failed to serialize ID list! Potentially unreachable?");
+    let market_data_serialized = &state
+        .lock().await
+        .market_data
+        .to_string();
+
+    OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open("assets/bot_data.json")
+        .expect("Failed to open file handle to `assets/bot_data.json`! Does the file exist?")
+        .write_all(bot_data_serialized.as_bytes())
+        .expect("Failed to write to `assets/bot_data.json`! Is the file in use?");
+    OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open("assets/id_list.json")
+        .expect("Failed to open file handle to `assets/id_list.json`! Does the file exist?")
+        .write_all(id_list_serialized.as_bytes())
+        .expect("Failed to write to `assets/id_list.json`! Is the file in use?");
+    OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open("assets/market_data.json")
+        .expect("Failed to open file handle to `assets/market_data.json`! Does the file exist?")
+        .write_all(market_data_serialized.as_bytes())
+        .expect("Failed to write to `assets/market_data.json`! Is the file in use?");
+    
+    println!("Succesfully saved! :3");
+}
 pub async fn autosave( state: Arc<Mutex<State>> ) {
     loop {
-        let bot_data_serialized = &state
-            .lock().await
-            .bot_data
-            .to_string();
-        let id_list_serialized = serde_json::to_string(&state
-            .lock().await
-            .id_list)
-            .expect("Failed to serialize ID list! Potentially unreachable?");
-        let market_data_serialized = &state
-            .lock().await
-            .market_data
-            .to_string();
-
-        OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open("assets/bot_data.json")
-            .expect("Failed to open file handle to `assets/bot_data.json`! Does the file exist?")
-            .write_all(bot_data_serialized.as_bytes())
-            .expect("Failed to write to `assets/bot_data.json`! Is the file in use?");
-        OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open("assets/id_list.json")
-            .expect("Failed to open file handle to `assets/id_list.json`! Does the file exist?")
-            .write_all(id_list_serialized.as_bytes())
-            .expect("Failed to write to `assets/id_list.json`! Is the file in use?");
-        OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open("assets/market_data.json")
-            .expect("Failed to open file handle to `assets/market_data.json`! Does the file exist?")
-            .write_all(market_data_serialized.as_bytes())
-            .expect("Failed to write to `assets/market_data.json`! Is the file in use?");
-        
-        println!("Succesfully saved! :3");
+        save( state.clone() ).await;
 
         sleep(Duration::from_secs(120)).await;
     }
