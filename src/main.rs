@@ -190,9 +190,12 @@ async fn main() {
         Client::builder(&token, intents)
         .event_handler(Bot {
             ubisoft_api,
-            state
+            state: state.clone()
         })
         .await.expect("Err creating client");
+    
+    // Start autosave
+    tokio::spawn(helper::autosave( state ));
     
     // Start r6rs
     if let Err(why) = client.start().await {
