@@ -29,12 +29,12 @@ async fn get_and_stringify_potential_profiles(
     no_special_characters: bool
 ) {
     let invalid_characters: [char; 4] = [' ', '.', '-', '_'];
-    let invalid_sites: [&str; 20] = [
+    let invalid_sites: [&str; 21] = [
         "Oracle", "8tracks", "Coders Rank", "Fiverr",
         "HackerNews", "Modelhub", "metacritic", "xHamster",
         "CNET", "YandexMusic", "HackerEarth", "OpenStreetMap", 
         "Pinkbike", "Slides", "Strava", "Archive", "CGTrader",
-        "G2G", "NationStates", "IFTTT"
+        "G2G", "NationStates", "IFTTT", "SoylentNews"
     ];
     
     let valid_usernames: Vec<String> = usernames
@@ -47,13 +47,16 @@ async fn get_and_stringify_potential_profiles(
             username
                 .chars()
                 .next().unwrap_or(' ')
-                .is_alphabetic())
+                .is_alphabetic()
+                &&
+            username.chars().count() < 20)
         })
         .map(|st| st.clone())
         .collect();
 
     // Query Sherlock
     for username in &valid_usernames {
+        println!("Querying Sherlock for {username}");
         let mut cmd = Command::new("python")
             .arg("sherlock/sherlock")
             .arg("--nsfw")
@@ -95,7 +98,6 @@ fn stringify_profiles( profiles: &Vec<Value>, usernames: &mut Vec<String>, body:
             .as_str()
             .unwrap_or("");
         usernames.push(String::from(username));
-        println!("Querying Sherlock for '{username}'...");
         match profile["platformType"].as_str() {
             Some("uplay") => {
                 *body += &format!("### Uplay:\n- {} ({})\n- https://r6.tracker.network/r6/search?name={account_id}&platform=4\n",
@@ -166,7 +168,8 @@ async fn linked(
     ubisoft_api: Arc<Mutex<UbisoftAPI>>,
     ctx: Context,
     msg: Message,
-    mut args: VecDeque<String>
+    mut args: VecDeque<String>,
+    platform: String
 ) {
     let mut body = String::new();
     let title = "OPSEC - Uplay Linked Search";
@@ -195,13 +198,13 @@ async fn linked(
     match 
         ubisoft_api
             .lock().await
-            .get_account_id(account_id.clone()).await
+            .get_account_id(account_id.clone(), platform).await
     {
         Some(id) => {
             account_id = String::from(id);
         }
         None => {
-            body += &format!("Account **{account_id}** does not exist! Is it a PC ID?");
+            body += &format!("Account **{account_id}** does not exist!");
 
             send_embed(
                 &ctx, 
@@ -313,7 +316,7 @@ async fn help(
         &ctx, 
         &msg, 
         "OPSEC - Help", 
-        "**Command list**:\n- `r6 opsec linked <pc uplay | account_id>`\n- `r6 opsec namefind <username1> <username2> ...`\n- `r6 opsec help`", 
+        "**Command list**:\n- `r6 opsec <pc | xbox | psn> <account name>`\n- `r6 opsec namefind <username1> <username2> ...`\n- `r6 opsec help`", 
         "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
     ).await
         .expect("Failed to send embed!");
@@ -329,8 +332,14 @@ pub async fn opsec(
         .unwrap_or(String::from("help"))
         .as_str()
     {
-        "linked" => {
-            tokio::spawn(linked( ubisoft_api, ctx, msg, args ));
+        "pc" => {
+            tokio::spawn(linked( ubisoft_api, ctx, msg, args, String::from("uplay") ));
+        },
+        "xbox" => {
+            tokio::spawn(linked( ubisoft_api, ctx, msg, args, String::from("xbl") ));
+        },
+        "psn" => {
+            tokio::spawn(linked( ubisoft_api, ctx, msg, args, String::from("psn") ));
         },
         "namefind" => {
             tokio::spawn(namefind( ctx, msg, args ));
