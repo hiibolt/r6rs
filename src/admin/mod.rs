@@ -18,8 +18,8 @@ pub async fn admin( ctx: Context, msg: Message, mut args: VecDeque<String> ) {
         },
         nonexistant => {
             send_embed(
-                ctx, 
-                msg, 
+                &ctx, 
+                &msg, 
                 "Command does not exist", 
                 &format!("The command **{nonexistant}** is not valid!\n\n**Valid commands**:\nrecent\nwatch\nunwatch\nwatchlist"), 
                 "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"

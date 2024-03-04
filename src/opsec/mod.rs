@@ -1,16 +1,12 @@
 use crate::VecDeque;
 use crate::Message;
 use crate::Context;
-use crate::unimplemented;
 use crate::send_embed;
+use crate::helper::edit_embed;
 use crate::UbisoftAPI;
-use crate::State;
 use crate::Value;
 use crate::{ Arc, Mutex };
-use tungstenite::{connect};
-use url::Url;
 use std::process::{Command, Stdio};
-use std::path::Path;
 use std::io::{BufReader, BufRead};
 
 
@@ -23,26 +19,35 @@ async fn get_profiles( ubisoft_api: Arc<Mutex<UbisoftAPI>>, account_id: &str ) -
     Some(profiles.get("profiles")?
         .as_array()?.clone())
 }
-async fn get_and_stringify_potential_profiles( usernames: &Vec<String>, body: &mut String ) {
+async fn get_and_stringify_potential_profiles( 
+    usernames: &Vec<String>, 
+    ctx: &Context, 
+    msg: &mut Message, 
+    title: &str, 
+    body: &mut String, 
+    url: &str,
+    no_special_characters: bool
+) {
     let invalid_characters: [char; 4] = [' ', '.', '-', '_'];
-    let invalid_sites: [&str; 15] = [
+    let invalid_sites: [&str; 19] = [
         "Oracle", "8tracks", "Coders Rank", "Fiverr",
         "HackerNews", "Modelhub", "metacritic", "xHamster",
         "CNET", "YandexMusic", "HackerEarth", "OpenStreetMap", 
-        "Pinkbike", "Slides", "Strava"
+        "Pinkbike", "Slides", "Strava", "Archive", "CGTrader",
+        "G2G", "NationStates"
     ];
     
     let valid_usernames: Vec<String> = usernames
         .iter()
         .filter(|username| {
-            !invalid_characters
+            !no_special_characters || (!invalid_characters
                 .iter()
                 .any(|&ch| username.contains(ch)) 
                 && 
             username
                 .chars()
                 .next().unwrap_or(' ')
-                .is_alphabetic()
+                .is_alphabetic())
         })
         .map(|st| st.clone())
         .collect();
@@ -51,8 +56,10 @@ async fn get_and_stringify_potential_profiles( usernames: &Vec<String>, body: &m
     for username in &valid_usernames {
         let mut cmd = Command::new("python")
             .arg("sherlock/sherlock")
-            .arg(&format!("{username}"))
             .arg("--nsfw")
+            .arg("--folderoutput")
+            .arg("sherlock_output")
+            .arg(&format!("{username}"))
             .stdout(Stdio::piped())
             .spawn()
             .expect("Issue running the Sherlock command! Did you install with Nix?");
@@ -69,7 +76,14 @@ async fn get_and_stringify_potential_profiles( usernames: &Vec<String>, body: &m
                 {
                     continue;
                 }
-                *body += &format!("\n{}", output);
+                *body += &format!("\n{}", output);            
+                edit_embed(
+                    &ctx,
+                    msg,
+                    title,
+                    &body,
+                    url
+                ).await;
             }
         }
         cmd.wait().unwrap();
@@ -155,7 +169,7 @@ async fn linked(
     mut args: VecDeque<String>
 ) {
     let mut body = String::new();
-    let title = "OPSEC - Full Data Dump";
+    let title = "OPSEC - Uplay Linked Search";
 
     // Ensure input argument
     let input_option = args
@@ -164,8 +178,8 @@ async fn linked(
         body += "Please supply an account ID or username!";
 
         send_embed(
-            ctx, 
-            msg, 
+            &ctx, 
+            &msg, 
             title, 
             &body, 
             "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
@@ -190,8 +204,8 @@ async fn linked(
             body += &format!("Account **{account_id}** does not exist! Is it a PC ID?");
 
             send_embed(
-                ctx, 
-                msg, 
+                &ctx, 
+                &msg, 
                 title, 
                 &body, 
                 "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
@@ -202,45 +216,65 @@ async fn linked(
         }
     }
     
-    let profiles: Vec<Value> = get_profiles( ubisoft_api.clone(), &account_id )
-        .await
-        .unwrap_or(Vec::new());
+    // Ensure valid account ID
+    let profiles_option: Option<Vec<Value>> = get_profiles( ubisoft_api.clone(), &account_id )
+        .await;
+    if profiles_option.is_none() {
+        let _ = send_embed(
+            &ctx, 
+            &msg, 
+            title, 
+            "Account ID does not exist!", 
+            "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+        ).await
+            .unwrap();
+        return;
+    }
+    let profiles = profiles_option
+        .expect("Unreachable");
     let mut usernames: Vec<String> = Vec::new();
     
     body += "## ⛓️ Linked Profiles\n";
     stringify_profiles( &profiles, &mut usernames, &mut body, &account_id );
 
-    body += "## ❔ Potential Profiles\n";
-    get_and_stringify_potential_profiles ( &usernames, &mut body ).await;
-
-
-    send_embed(
-        ctx, 
-        msg, 
+    let mut sent = send_embed(
+        &ctx, 
+        &msg, 
         title, 
         &body, 
         &format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png")
     ).await
         .unwrap();
+
+    body += "## ❔ Potential Profiles\n";
+    get_and_stringify_potential_profiles (
+        &usernames,
+        &ctx,
+        &mut sent,
+        title,
+        &mut body,
+        &format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png"),
+        true
+    ).await;
 }
-async fn dump( 
-    ubisoft_api: Arc<Mutex<UbisoftAPI>>,
+async fn namefind( 
     ctx: Context,
     msg: Message,
-    mut args: VecDeque<String>
+    args: VecDeque<String>
 ) { 
     let mut body = String::new();
-    let title = "OPSEC - Full Data Dump";
+    let title = "OPSEC - Namefind";
 
     // Ensure argument
-    let input_option = args
-        .pop_front();
-    if input_option.is_none() {
-        body += "Please supply an account ID or username!";
+    let usernames: Vec<String> = args
+        .into_iter()
+        .collect();
+    if usernames.len() == 0 {
+        body += "Please supply a username!";
 
         send_embed(
-            ctx, 
-            msg, 
+            &ctx, 
+            &msg, 
             title, 
             &body, 
             "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
@@ -249,65 +283,43 @@ async fn dump(
 
         return;
     }
-    let mut account_id = input_option
-        .expect("Unreachable");
-
-    match 
-        ubisoft_api
-            .lock().await
-            .get_account_id(account_id.clone()).await
-    {
-        Some(id) => {
-            account_id = String::from(id);
-        }
-        None => {
-            body += &format!("Account **{account_id}** does not exist! Is it a PC ID?");
-
-            send_embed(
-                ctx, 
-                msg, 
-                title, 
-                &body, 
-                "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
-            ).await
-                .unwrap();
-
-            return;
-        }
-    }
     
-    let player: Option<Value> = ubisoft_api
-        .lock().await
-        .basic_request(format!("https://public-ubiservices.ubi.com/v1/profiles/{account_id}"))
-        .await.ok();
-    let persona: Option<Value> = ubisoft_api
-        .lock().await
-        .basic_request(format!("https://public-ubiservices.ubi.com/v1/profiles/persona?profileIds={account_id}&spaceId=0d2ae42d-4c27-4cb7-af6c-2099062302bb"))
-        .await.ok();
-    let stats: Option<Value> = ubisoft_api
-        .lock().await
-        .basic_request(format!("https://public-ubiservices.ubi.com/v2/spaces/0d2ae42d-4c27-4cb7-af6c-2099062302bb/title/r6s/skill/full_profiles?profile_ids={}&platform_families=pc", account_id))
-        .await.ok();
-    let profiles: Vec<Value> = get_profiles( ubisoft_api.clone(), &account_id )
-        .await
-        .unwrap_or(Vec::new());
-
-    println!("{account_id} - {profiles:?}");
-
-    body += &account_id;
-
-    send_embed(
-        ctx, 
-        msg, 
+    body += &format!("Searching for {:?}", usernames);
+    
+    let mut sent_msg = send_embed(
+        &ctx, 
+        &msg, 
         title, 
         &body, 
         "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
     ).await
-        .unwrap();
+        .expect("Failed to send embed!");
+
+    get_and_stringify_potential_profiles(
+        &usernames, 
+        &ctx, 
+        &mut sent_msg, 
+        title, 
+        &mut body, 
+        "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4",
+        false
+    ).await;   
+}
+async fn help(
+    ctx: Context,
+    msg: Message
+) {
+    let _ = send_embed(
+        &ctx, 
+        &msg, 
+        "OPSEC - Help", 
+        "**Command list**:\n- `r6 opsec linked <pc uplay | account_id>`\n- `r6 opsec namefind <username1> <username2> ...`\n- `r6 opsec help`", 
+        "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+    ).await
+        .expect("Failed to send embed!");
 }
 pub async fn opsec( 
     ubisoft_api: Arc<Mutex<UbisoftAPI>>,
-    state: Arc<Mutex<State>>,
     ctx: Context,
     msg: Message,
     mut args: VecDeque<String> 
@@ -320,18 +332,18 @@ pub async fn opsec(
         "linked" => {
             linked( ubisoft_api, ctx, msg, args ).await;
         },
-        "dump" => {
-            dump( ubisoft_api, ctx, msg, args ).await;
+        "namefind" => {
+            namefind( ctx, msg, args ).await;
         },
         "help" => {
-            unimplemented( ctx, msg, "help" ).await;
+            help( ctx, msg ).await;
         },
         nonexistant => {
             send_embed(
-                ctx, 
-                msg, 
+                &ctx, 
+                &msg, 
                 "Command does not exist", 
-                &format!("The command **{nonexistant}** is not valid!"), 
+                &format!("The command `r6 opsec {nonexistant}` is not valid!\n\nUse `r6 opsec help` for a complete command list."), 
                 "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
             ).await
                 .unwrap();

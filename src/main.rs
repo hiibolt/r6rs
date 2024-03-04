@@ -28,8 +28,6 @@ use serde_json::{Value};
 use serenity::async_trait;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
-use serenity::builder::{CreateEmbed, CreateMessage};
-use serenity::model::id::ChannelId;
 use serenity::prelude::*;
 use std::collections::HashMap;
 
@@ -95,7 +93,7 @@ impl EventHandler for Bot {
                 }
 
                 // Otherwise, go ahead
-                tokio::spawn(opsec(self.ubisoft_api.clone(), self.state.clone(), ctx, msg, args)); 
+                tokio::spawn(opsec(self.ubisoft_api.clone(), ctx, msg, args)); 
             },
             "bans" => {
                 // Check if they're not on the whitelist

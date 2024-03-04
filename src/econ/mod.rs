@@ -39,8 +39,8 @@ pub async fn econ( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut arg
             let result: String = list( state ).await;
 
             send_embed(
-                ctx, 
-                msg, 
+                &ctx, 
+                &msg, 
                 "Tracked Skins", 
                 &result, 
                 "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
@@ -52,8 +52,8 @@ pub async fn econ( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut arg
         },
         nonexistant => {
             send_embed(
-                ctx, 
-                msg, 
+                &ctx, 
+                &msg, 
                 "Command does not exist", 
                 &format!("The command **{nonexistant}** is not valid!"), 
                 "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
