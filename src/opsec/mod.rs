@@ -29,12 +29,12 @@ async fn get_and_stringify_potential_profiles(
     no_special_characters: bool
 ) {
     let invalid_characters: [char; 4] = [' ', '.', '-', '_'];
-    let invalid_sites: [&str; 19] = [
+    let invalid_sites: [&str; 20] = [
         "Oracle", "8tracks", "Coders Rank", "Fiverr",
         "HackerNews", "Modelhub", "metacritic", "xHamster",
         "CNET", "YandexMusic", "HackerEarth", "OpenStreetMap", 
         "Pinkbike", "Slides", "Strava", "Archive", "CGTrader",
-        "G2G", "NationStates"
+        "G2G", "NationStates", "IFTTT"
     ];
     
     let valid_usernames: Vec<String> = usernames
@@ -330,13 +330,13 @@ pub async fn opsec(
         .as_str()
     {
         "linked" => {
-            linked( ubisoft_api, ctx, msg, args ).await;
+            tokio::spawn(linked( ubisoft_api, ctx, msg, args ));
         },
         "namefind" => {
-            namefind( ctx, msg, args ).await;
+            tokio::spawn(namefind( ctx, msg, args ));
         },
         "help" => {
-            help( ctx, msg ).await;
+            tokio::spawn(help( ctx, msg ));
         },
         nonexistant => {
             send_embed(
