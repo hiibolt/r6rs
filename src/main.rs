@@ -180,22 +180,21 @@ async fn main() {
             )
         )
     );
-    ubisoft_api
-        .lock().await
-        .login().await
-        .expect("Failed to login!");
+
+    // Start login process
+    tokio::spawn(UbisoftAPI::auto_login( ubisoft_api.clone()));
+
+    // Start autosave
+    tokio::spawn(helper::autosave( state.clone() ));
 
     // Build client with state
     let mut client =
         Client::builder(&token, intents)
         .event_handler(Bot {
-            ubisoft_api,
-            state: state.clone()
+            ubisoft_api: ubisoft_api,
+            state: state
         })
         .await.expect("Err creating client");
-    
-    // Start autosave
-    tokio::spawn(helper::autosave( state ));
     
     // Start r6rs
     if let Err(why) = client.start().await {

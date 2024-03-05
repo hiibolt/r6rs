@@ -1,17 +1,14 @@
 use base64::prelude::*;
 use reqwest::header::HeaderMap;
 use crate::Value;
-use std::collections::HashMap;
 use std::error::Error;
 use reqwest::StatusCode;
+use tokio::time::{ sleep, Duration };
+use crate::{ Arc, Mutex };
 
 #[derive(Debug)]
 pub struct UbisoftAPI {
-    email: String,
-    password: String,
     token: String,
-
-    space_ids: HashMap<String, String>,
     headers: HeaderMap
 }
 impl UbisoftAPI {
@@ -21,19 +18,10 @@ impl UbisoftAPI {
     }
 
     pub fn new ( email: String, password: String ) -> Self {
-        let space_ids = HashMap::from([
-            ("uplay".to_string(), "0d2ae42d-4c27-4cb7-af6c-2099062302bb".to_string()),
-            ("psn".to_string(), "0d2ae42d-4c27-4cb7-af6c-2099062302bb".to_string()),
-            ("xbl".to_string(), "0d2ae42d-4c27-4cb7-af6c-2099062302bb".to_string())
-        ]);
         let token = Self::get_basic_token( email.clone(), password.clone() );
 
         Self {
-            email,
-            password,
             token,
-
-            space_ids,
             headers: HeaderMap::new()
         }
     }
@@ -70,6 +58,15 @@ impl UbisoftAPI {
         }
 
         Ok(())
+    }
+    pub async fn auto_login( state: Arc<Mutex<UbisoftAPI>> ) {
+        loop {
+            state
+                .lock().await
+                .login().await.expect("Failed to log in!");
+
+            sleep(Duration::from_secs(6300)).await;
+        }
     }
 
     pub async fn basic_request ( &mut self, url: String ) -> Result<Value, Box<dyn Error>> {

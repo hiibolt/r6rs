@@ -7,7 +7,6 @@ use crate::Arc;
 use crate::Value;
 use crate::unimplemented;
 use crate::send_embed;
-use std::collections::HashMap;
 
 async fn list( state: Arc<Mutex<State>> ) -> String {
     let mut msg: String = String::from(
