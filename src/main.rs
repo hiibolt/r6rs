@@ -88,7 +88,7 @@ impl EventHandler for Bot {
                     .iter()
                     .any(|x| x.as_u64().expect("User ids need to be numbers!") == user_id)
                 {
-                    no_access( ctx, msg.clone(), "econ", user_id ).await;
+                    no_access( ctx, msg.clone(), "opsec", user_id ).await;
                     return;
                 }
 

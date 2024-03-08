@@ -4,7 +4,6 @@ use crate::Context;
 use crate::State;
 use crate::Mutex;
 use crate::Arc;
-use crate::Value;
 use crate::unimplemented;
 use crate::send_embed;
 

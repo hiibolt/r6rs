@@ -6,8 +6,10 @@ use crate::helper::edit_embed;
 use crate::UbisoftAPI;
 use crate::Value;
 use crate::{ Arc, Mutex };
-use std::process::{Command, Stdio};
-use std::io::{BufReader, BufRead};
+use crate::env;
+use tokio::process::{Command};
+use std::process::Stdio;
+use tokio::io::{BufReader, AsyncBufReadExt};
 
 
 async fn get_profiles( ubisoft_api: Arc<Mutex<UbisoftAPI>>, account_id: &str ) -> Option<Vec<Value>> {
@@ -29,12 +31,13 @@ async fn get_and_stringify_potential_profiles(
     no_special_characters: bool
 ) {
     let invalid_characters: [char; 4] = [' ', '.', '-', '_'];
-    let invalid_sites: [&str; 21] = [
+    let invalid_sites: [&str; 25] = [
         "Oracle", "8tracks", "Coders Rank", "Fiverr",
         "HackerNews", "Modelhub", "metacritic", "xHamster",
         "CNET", "YandexMusic", "HackerEarth", "OpenStreetMap", 
         "Pinkbike", "Slides", "Strava", "Archive", "CGTrader",
-        "G2G", "NationStates", "IFTTT", "SoylentNews"
+        "G2G", "NationStates", "IFTTT", "SoylentNews", "hunting",
+        "Contently", "Euw", "OurDJTalk"
     ];
     
     let valid_usernames: Vec<String> = usernames
@@ -57,11 +60,20 @@ async fn get_and_stringify_potential_profiles(
     // Query Sherlock
     for username in &valid_usernames {
         println!("Querying Sherlock for {username}");
+        let proxy_link = env::var("PROXY_LINK")
+            .expect("Could not find PROXY_LINK in the environment!");
+        
+        println!("Starting with proxy link:\n\t{proxy_link}");
+        
         let mut cmd = Command::new("python")
-            .arg("sherlock/sherlock")
+            .arg("/sherlock/sherlock")
             .arg("--nsfw")
             .arg("--folderoutput")
             .arg("sherlock_output")
+            .arg("--timeout")
+            .arg("5")
+            .arg("--proxy")
+            .arg(proxy_link)
             .arg(&format!("{username}"))
             .stdout(Stdio::piped())
             .spawn()
@@ -69,15 +81,17 @@ async fn get_and_stringify_potential_profiles(
         {
             let stdout = cmd.stdout.as_mut().unwrap();
             let stdout_reader = BufReader::new(stdout);
-            let stdout_lines = stdout_reader.lines();
+            let mut stdout_lines = stdout_reader.lines();
     
-            for line in stdout_lines {
-                let output = line.unwrap_or(String::from(""));
+            while let Ok(Some(output)) = stdout_lines.next_line().await {
                 if invalid_sites
                         .iter()
                         .any(|site| output.contains(site))
                 {
                     continue;
+                }
+                if output.contains("http") || output.contains("https") {
+                    println!("Found site for {username}: {output}");
                 }
                 *body += &format!("\n{}", output);            
                 edit_embed(
@@ -89,7 +103,7 @@ async fn get_and_stringify_potential_profiles(
                 ).await;
             }
         }
-        cmd.wait().unwrap();
+        cmd.wait().await.unwrap();
     }
 } 
 fn stringify_profiles( profiles: &Vec<Value>, usernames: &mut Vec<String>, body: &mut String, account_id: &String ) {

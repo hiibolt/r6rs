@@ -3,7 +3,6 @@ use crate::Message;
 use crate::Context;
 use crate::send_embed;
 use crate::State;
-use crate::Value;
 use crate::{ Arc, Mutex };
 use crate::helper::save;
 
