@@ -68,7 +68,7 @@ pub async fn help( ctx: Context, msg: Message ) {
         &ctx, 
         &msg, 
         "ADMIN - Help", 
-        &format!("**Command List**:\n- `r6 admin whitelist <user id>`\n- `r6 admin blacklist <user id>`\n- `r6 admin help`"), 
+        &format!("**Command List**:\n- `r6 admin whitelist <section> <user id>`\n- `r6 admin blacklist <section> <user id>`\n- `r6 admin help`"), 
         "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
     ).await.unwrap();
 }
@@ -86,7 +86,7 @@ pub async fn admin( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut ar
                         send_embed(
                             &ctx, 
                             &msg, 
-                            "ADMIN - Whitelist Success", 
+                            "Admin - Whitelist Success", 
                             &format!("Successfully added person to section!"), 
                             "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
                         ).await.unwrap();
@@ -96,8 +96,8 @@ pub async fn admin( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut ar
                         send_embed(
                             &ctx, 
                             &msg, 
-                            "ADMIN - Whitelist Error", 
-                            &format!("Failed for reason `{err}`"), 
+                            "Admin - Whitelist Error", 
+                            &format!("Failed for reason \"{err}\""), 
                             "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
                         ).await.unwrap();
                     }
@@ -108,7 +108,7 @@ pub async fn admin( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut ar
             tokio::spawn(async move {
                 match blacklist( state, args ).await {
                     Ok(_) => {
-                        println!("ADMIN - Blacklist Success!");
+                        println!("Admin - Blacklist Success!");
                         send_embed(
                             &ctx, 
                             &msg, 
@@ -122,8 +122,8 @@ pub async fn admin( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut ar
                         send_embed(
                             &ctx, 
                             &msg, 
-                            "ADMIN - Blacklist Error", 
-                            &format!("Failed for reason `{err}`"), 
+                            "Admin - Blacklist Error", 
+                            &format!("Failed for reason \"{err}\""), 
                             "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
                         ).await.unwrap();
                     }

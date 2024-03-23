@@ -127,7 +127,7 @@ impl EventHandler for Bot {
                 // Otherwise, go ahead
                 tokio::spawn(admin( self.state.clone(), ctx, msg, args ));
             },
-            _ => { tokio::spawn(help(ctx, msg, args)); }
+            _ => { tokio::spawn(help(ctx, msg)); }
         }
     }
 

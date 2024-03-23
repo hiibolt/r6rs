@@ -169,7 +169,7 @@ async fn help(
         &ctx, 
         &msg, 
         "R6 - Economy - Help", 
-        "**Command list**:\n- `r6 econ analyze <item name | item id>`\n- `r6 econ graph <item name | item id>`\n- `r6 econ profit <purchased at> <item name | item id>`\n- `r6 econ help`", 
+        "**Command List**:\n- `r6 econ analyze <item name | item id>`\n- `r6 econ graph <item name | item id>`\n- `r6 econ profit <purchased at> <item name | item id>`\n- `r6 econ help`", 
         "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
     ).await
         .expect("Failed to send embed!");
