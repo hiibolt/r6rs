@@ -96,15 +96,15 @@ async fn data( state: Arc<Mutex<State>>, args: VecDeque<String> ) -> Result<(Str
     let ten_rap: f64 = filtered_data
         .iter().take(10).fold(0f64, |acc, vc| acc + vc[0])
         /
-        (filtered_data.iter().take(10).count() as f64).min(1f64);
+        (filtered_data.iter().take(10).count() as f64).max(1f64);
     let hundred_rap: f64 = filtered_data
         .iter().take(100).fold(0f64, |acc, vc| acc + vc[0])
         /
-        (filtered_data.iter().take(100).count() as f64).min(1f64);
+        (filtered_data.iter().take(100).count() as f64).max(1f64);
     let all_time_rap: f64 = filtered_data
         .iter().fold(0f64, |acc, vc| acc + vc[0])
         /
-        (filtered_data.iter().count() as f64).min(1f64);
+        (filtered_data.iter().count() as f64).max(1f64);
     let tags = item_data
         .get("tags")
         .and_then(|val| {
@@ -319,7 +319,7 @@ async fn profit(
     let ten_rap: f64 = filtered_data
         .iter().take(10).fold(0f64, |acc, vc| acc + vc[0])
         /
-        (filtered_data.iter().take(10).count() as f64).min(1f64);
+        (filtered_data.iter().take(10).count() as f64).max(1f64);
     let current_net_gain = (ten_rap - purchase_price ) * 0.9f64;
 
     // Extract asset url
