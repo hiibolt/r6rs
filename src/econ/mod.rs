@@ -4,7 +4,6 @@ use crate::Context;
 use crate::State;
 use crate::Mutex;
 use crate::Arc;
-use crate::unimplemented;
 use crate::send_embed;
 
 async fn name_or_item_id( state: Arc<Mutex<State>>, unknown_id: String ) -> Result<String, String> {
@@ -162,6 +161,19 @@ async fn list( state: Arc<Mutex<State>>, mut args: VecDeque<String> ) -> String 
 
     msg
 }
+async fn help(
+    ctx: Context,
+    msg: Message
+) {
+    let _ = send_embed(
+        &ctx, 
+        &msg, 
+        "R6 - Economy - Help", 
+        "**Command list**:\n- `r6 econ analyze <item name | item id>`\n- `r6 econ graph <item name | item id>`\n- `r6 econ profit <purchased at> <item name | item id>`\n- `r6 econ help`", 
+        "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+    ).await
+        .expect("Failed to send embed!");
+}
 pub async fn econ( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut args: VecDeque<String> ) {
     match args
         .pop_front()
@@ -197,14 +209,14 @@ pub async fn econ( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut arg
                 .unwrap();
         },
         "help" => {
-            unimplemented( ctx, msg, "help" ).await;
+            tokio::spawn(help( ctx, msg ));
         },
         nonexistant => {
             send_embed(
                 &ctx, 
                 &msg, 
                 "Command does not exist", 
-                &format!("The command **{nonexistant}** is not valid!"), 
+                &format!("The subcommand `{nonexistant}` is not valid!\n\nConfused?\nRun `r6 econ help` for information on `econ`'s commands\nRun `r6 help` for information on all commands"), 
                 "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
             ).await
                 .unwrap();
