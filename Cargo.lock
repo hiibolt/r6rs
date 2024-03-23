@@ -933,6 +933,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d231b230927b5e4ad203db57bbcbee2802f6bce620b1e4a9024a07d94e2907ec"
 
 [[package]]
+name = "plotpy"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "662f8867d53720af4c262f067115e060fee394da9b021e93a792cd16f76db1cc"
+
+[[package]]
 name = "powerfmt"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -978,6 +984,7 @@ name = "r6rs"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.0",
+ "plotpy",
  "reqwest",
  "serde_json",
  "serenity",

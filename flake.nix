@@ -23,6 +23,7 @@
           torrequest
           openpyxl
           exrex
+          matplotlib
         ];
         python = pkgs.python311.withPackages python-package-list;
       in

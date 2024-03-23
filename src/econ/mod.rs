@@ -1,10 +1,31 @@
-use crate::VecDeque;
-use crate::Message;
-use crate::Context;
-use crate::State;
-use crate::Mutex;
-use crate::Arc;
+use crate::{ 
+    Message,
+    Context,
+};
+use serenity::all::{
+    CreateMessage,
+    CreateEmbed,
+    CreateAttachment
+};
+use crate::{
+    VecDeque,
+
+    Mutex,
+    Arc
+};
 use crate::send_embed;
+use crate::State;
+use std::time::{
+    SystemTime,
+    Duration,
+    UNIX_EPOCH
+};
+use plotpy::{
+    linspace,
+    Curve,
+    Plot,
+    StrError
+};
 
 async fn name_or_item_id( state: Arc<Mutex<State>>, unknown_id: String ) -> Result<String, String> {
     if unknown_id.len() == 0 {
@@ -55,7 +76,7 @@ async fn data( state: Arc<Mutex<State>>, args: VecDeque<String> ) -> Result<(Str
                     return None;
                 }
 
-                return Some(vec!(data_point_as_arr[0].as_f64().unwrap(), data_point_as_arr[0].as_f64().unwrap()));
+                return Some(vec!(data_point_as_arr[0].as_f64().unwrap(), data_point_as_arr[1].as_f64().unwrap()));
             }
             None
         })
@@ -161,6 +182,97 @@ async fn list( state: Arc<Mutex<State>>, mut args: VecDeque<String> ) -> String 
 
     msg
 }
+async fn graph(
+    state: Arc<Mutex<State>>,
+    args: VecDeque<String>
+) -> Result<String, String> {
+    let item_id = name_or_item_id(
+        state.clone(),
+        args.into_iter()
+            .collect::<Vec<String>>()
+            .join(" ")
+    ).await?;
+
+    // Grab the item data
+    let item_data = state
+        .lock().await
+        .market_data
+        .get(&item_id)
+        .ok_or(format!("We aren't tracking the item ID/item name `{item_id}`. Please request that @hiibolt add it!"))?
+        .clone();
+
+    // Grab a copy  of the sold data
+    let item_sold_data: Vec<serde_json::Value> = item_data
+        .get("sold").ok_or(String::from("Couldn't retrieve data! Contact @hiibolt if you can see this."))?
+        .as_array().ok_or(String::from("Couldn't retrieve data! Contact @hiibolt if you can see this."))?
+        .clone();
+    
+    // Remove null sales
+    let filtered_data: Vec<Vec<f64>> = item_sold_data
+        .iter()
+        .flat_map(|data_point| {
+            if let Some(data_point_as_arr) = data_point.as_array().clone() {
+                //todo!(); make this better
+                if data_point_as_arr[0].is_null() || data_point_as_arr[1].is_null() {
+                    return None;
+                }
+
+                return Some(vec!(data_point_as_arr[0].as_f64().unwrap(), data_point_as_arr[1].as_f64().unwrap()));
+            }
+            None
+        })
+        .collect();
+    
+    // Extract the time and price data
+    let mut times: Vec<f64> = filtered_data
+        .iter()
+        .map(|arr| {
+            let time_since = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs_f64() - arr[1];
+            time_since / 3600f64 / 24f64
+        })
+        .collect();
+    let mut prices: Vec<f64> = filtered_data
+        .iter()
+        .map(|arr| arr[0])
+        .collect();
+    times.reverse();
+    prices.reverse();
+    
+    // Extract the item metadata
+    let item_name = item_data
+        .get("name")
+        .and_then(|val| val.as_str())
+        .unwrap_or("???");
+    let item_type = item_data
+        .get("type")
+        .and_then(|val| val.as_str())
+        .unwrap_or("???");
+    let item_asset_url = item_data
+        .get("asset_url")
+        .and_then(|val| val.as_str())
+        .unwrap_or("???");
+    
+    // Define our data curve
+    let mut data_curve = Curve::new();
+    data_curve.draw(&times, &prices);
+    
+    // Define the output file path
+    let item_path = format!("assets/{item_id}.png");
+    
+    // Plot our data curve
+    Plot::new()
+        .add(&data_curve)
+        .set_title(&format!("{item_name} ({item_type})"))
+        .set_labels("Time (days ago)","Price (R6 Credits)")
+        .save(&item_path)?;
+    
+    // Remove the associated python file
+    tokio::fs::remove_file(format!("assets/{item_id}.py"))
+        .await
+        .map_err(|err| format!("{err:?}"))?;
+    
+    Ok(item_id)
+}
 async fn help(
     ctx: Context,
     msg: Message
@@ -208,6 +320,41 @@ pub async fn econ( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut arg
             ).await
                 .unwrap();
         },
+        "graph" => {
+            match 
+                graph( state, args )
+                .await 
+            {
+                Ok(item_id) => {
+
+                    let attachment = CreateAttachment::path(&format!("assets/{item_id}.png"))
+                            .await
+                            .expect("Failed to create attachment!");
+
+                    let embed = CreateEmbed::new()
+                        .image(format!("attachment://{item_id}.png"));
+
+                    let builder = CreateMessage::new()
+                        .embed(embed)
+                        .add_file(attachment);
+
+                    msg.channel_id
+                        .send_message(&ctx.http, builder)
+                        .await
+                        .expect("Failed to send image embed! Probably a perms thing.");
+                },
+                Err(err_msg) => {
+                    send_embed(
+                        &ctx, 
+                        &msg, 
+                        "Error!", 
+                        &err_msg, 
+                        "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+                    ).await
+                        .expect("Failed to send embed! Probably a perms thing.");
+                }
+            };
+        }
         "help" => {
             tokio::spawn(help( ctx, msg ));
         },
