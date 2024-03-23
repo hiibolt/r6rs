@@ -17,14 +17,11 @@ use crate::send_embed;
 use crate::State;
 use std::time::{
     SystemTime,
-    Duration,
     UNIX_EPOCH
 };
 use plotpy::{
-    linspace,
     Curve,
     Plot,
-    StrError
 };
 
 async fn name_or_item_id( state: Arc<Mutex<State>>, unknown_id: String ) -> Result<String, String> {
@@ -247,10 +244,6 @@ async fn graph(
         .get("type")
         .and_then(|val| val.as_str())
         .unwrap_or("???");
-    let item_asset_url = item_data
-        .get("asset_url")
-        .and_then(|val| val.as_str())
-        .unwrap_or("???");
     
     // Define our data curve
     let mut data_curve = Curve::new();
@@ -272,6 +265,72 @@ async fn graph(
         .map_err(|err| format!("{err:?}"))?;
     
     Ok(item_id)
+}
+async fn profit( 
+    state: Arc<Mutex<State>>,
+    mut args: VecDeque<String> 
+) -> Result<(String, String), String> {
+    let mut msg = String::from("");
+
+    // Grab positional arguments
+    let purchase_price = args
+        .pop_front()
+        .ok_or(String::from("Missing `purchase price` positional argument!"))?
+        .parse::<f64>()
+        .map_err(|_| String::from("Could not parse the `purchase price` positional argument into a number!\n\nDid you accidentally flip the `purchase price` and `item name/id`?"))?;
+    let item_id = name_or_item_id(
+        state.clone(),
+        args.into_iter()
+            .collect::<Vec<String>>()
+            .join(" ")
+    ).await?;
+
+    // Grab the item data
+    let item_data = state
+        .lock().await
+        .market_data
+        .get(&item_id)
+        .ok_or(format!("We aren't tracking the item ID/item name `{item_id}`. Please request that @hiibolt add it!"))?
+        .clone();
+
+    // Grab a copy  of the sold data
+    let item_sold_data: Vec<serde_json::Value> = item_data
+        .get("sold").ok_or(String::from("Couldn't retrieve data! Contact @hiibolt if you can see this."))?
+        .as_array().ok_or(String::from("Couldn't retrieve data! Contact @hiibolt if you can see this."))?
+        .clone();
+        
+    // Remove null sales
+    let filtered_data: Vec<Vec<f64>> = item_sold_data
+        .iter()
+        .flat_map(|data_point| {
+            if let Some(data_point_as_arr) = data_point.as_array().clone() {
+                if data_point_as_arr[0].is_null() || data_point_as_arr[1].is_null() {
+                    return None;
+                }
+
+                return Some(vec!(data_point_as_arr[0].as_f64().unwrap(), data_point_as_arr[1].as_f64().unwrap()));
+            }
+            None
+        })
+        .collect();
+
+    // Calculate various sale numbers
+    let profitable_sell: f64 = 1.1f64 * purchase_price;
+    let ten_rap: f64 = filtered_data
+        .iter().take(10).fold(0f64, |acc, vc| acc + vc[0])
+        /
+        (filtered_data.iter().take(10).count() as f64).min(1f64);
+    let current_net_gain = (ten_rap - purchase_price ) * 0.9f64;
+
+    // Extract asset url
+    let item_asset_url = item_data
+        .get("asset_url")
+        .and_then(|val| val.as_str())
+        .unwrap_or("???");
+    
+    msg += &format!("\n### Purchased At:\n\t**{purchase_price}** R6 credits\n### Sale Price to Break Even:\n\t**{profitable_sell}** R6 credits\n### Current Net Gain if Sold:\n\t**{current_net_gain}** R6 credits");
+
+    Ok((msg, item_asset_url.to_owned()))
 }
 async fn help(
     ctx: Context,
@@ -354,7 +413,33 @@ pub async fn econ( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut arg
                         .expect("Failed to send embed! Probably a perms thing.");
                 }
             };
-        }
+        },
+        "profit" => {
+            match 
+                profit( state, args ).await
+            {
+                Ok((body, asset_url)) => {
+                    send_embed(
+                        &ctx, 
+                        &msg, 
+                        "Profit Analytics", 
+                        &body, 
+                        &asset_url
+                    ).await
+                        .expect("Failed to send embed!");
+                },
+                Err(err_msg) => {
+                    send_embed(
+                        &ctx, 
+                        &msg, 
+                        "Error!", 
+                        &err_msg, 
+                        "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+                    ).await
+                        .expect("Failed to send embed!");
+                }
+            };
+        },
         "help" => {
             tokio::spawn(help( ctx, msg ));
         },
