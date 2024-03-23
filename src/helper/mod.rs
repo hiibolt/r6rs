@@ -31,23 +31,17 @@ pub async fn save( state: Arc<Mutex<State>> ) {
         .expect("Failed to open file handle to `assets/bot_data.json`! Does the file exist?")
         .write_all(bot_data_serialized.as_bytes())
         .expect("Failed to write to `assets/bot_data.json`! Is the file in use?");
+    /*
     OpenOptions::new()
         .write(true)
         .create(true)
         .truncate(true)
-        .open("assets/id_list.json")
-        .expect("Failed to open file handle to `assets/id_list.json`! Does the file exist?")
+        .open("assets/ids.json")
+        .expect("Failed to open file handle to `assets/ids.json`! Does the file exist?")
         .write_all(id_list_serialized.as_bytes())
-        .expect("Failed to write to `assets/id_list.json`! Is the file in use?");
-    OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open("assets/market_data.json")
-        .expect("Failed to open file handle to `assets/market_data.json`! Does the file exist?")
-        .write_all(market_data_serialized.as_bytes())
-        .expect("Failed to write to `assets/market_data.json`! Is the file in use?");
-    
+        .expect("Failed to write to `assets/ids.json`! Is the file in use?");
+    */
+
     println!("[Succesfully saved! :3]");
 }
 pub async fn autosave( state: Arc<Mutex<State>> ) {

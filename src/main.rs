@@ -152,10 +152,10 @@ async fn main() {
     // Read data files
     let bot_data_contents: String = read_to_string("assets/bot_data.json")
         .expect("Could not find 'assets/bot_data.json', please ensure you have created one!");
-    let id_list_contents: String = read_to_string("assets/id_list.json")
-        .expect("Could not find 'assets/id_list.json', please ensure you have created one!");
-    let market_data_contents: String = read_to_string("assets/market_data.json")
-        .expect("Could not find 'assets/market_data.json', please ensure you have created one!");
+    let id_list_contents: String = read_to_string("assets/ids.json")
+        .expect("Could not find 'assets/ids.json', please ensure you have created one!");
+    let market_data_contents: String = read_to_string("assets/data.json")
+        .expect("Could not find 'assets/data.json', please ensure you have created one!");
     
     // Build the state into an async mutex
     let state = Arc::new(Mutex::new(
@@ -163,9 +163,9 @@ async fn main() {
             bot_data: serde_json::from_str(&bot_data_contents)
                 .expect("Could not parse the contents of 'bot_data.json'!"),
             id_list: serde_json::from_str(&id_list_contents)
-                .expect("Could not parse the contents of 'id_list.json'!"),
+                .expect("Could not parse the contents of 'ids.json'!"),
             market_data: serde_json::from_str(&market_data_contents)
-                .expect("Could not parse the contents of 'market_data.json'!"),
+                .expect("Could not parse the contents of 'data.json'!"),
         }
     ));
 
