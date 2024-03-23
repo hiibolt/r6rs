@@ -10,7 +10,7 @@ pub async fn help(
         &ctx, 
         &msg, 
         "R6 - All Sections - Help", 
-        &(String::from("**Economy Command List**:\n- `r6 econ analyze <item name | item id>`\n- `r6 econ graph <item name | item id>`\n- `r6 econ profit <purchased at> <item name | item id>`\n- `r6 econ help`\n\n") +
+        &(String::from("**Economy Command List**:\n- `r6 econ analyze <item name | item id>`\n- `r6 econ graph <item name | item id>`\n- `r6 econ profit <purchased at> <item name | item id>`\n- `r6 econ list <(optional) page #>`\n- `r6 econ help`\n\n") +
             "**OPSEC Command List**:\n- `r6 opsec <pc | xbox | psn> <account name>`\n- `r6 opsec namefind <username1> <username2> ...`\n- `r6 opsec help`\n\n" + 
             "**Ban Watch Command List**:\n- **Still under development, stay cozy...**\n\n" +
             "**Admin Command List**:\n- `r6 admin whitelist <section> <user id>`\n- `r6 admin blacklist <section> <user id>`\n- `r6 admin help`\n\n\n*Developed by @hiibolt on GitHub*"),
