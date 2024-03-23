@@ -54,7 +54,7 @@ impl EventHandler for Bot {
             .collect();
         let user_id: u64 = msg.author.id.get();
 
-        if args.pop_front() != Some(String::from("r6rs")) {
+        if args.pop_front() != Some(String::from("r6")) {
             return;
         }
 
