@@ -54,7 +54,7 @@ impl EventHandler for Bot {
             .collect();
         let user_id: u64 = msg.author.id.get();
 
-        if args.pop_front() != Some(String::from("r6s")) {
+        if args.pop_front() != Some(String::from("r6rs")) {
             return;
         }
 
@@ -186,6 +186,9 @@ async fn main() {
 
     // Start autosave
     tokio::spawn(helper::autosave( state.clone() ));
+
+    // Start autopull
+    tokio::spawn(helper::autopull( state.clone() ));
 
     // Build client with state
     let mut client =

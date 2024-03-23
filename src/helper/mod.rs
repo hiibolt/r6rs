@@ -2,6 +2,7 @@ use crate::Message;
 use crate::Context;
 use crate::State;
 use crate::{ Arc, Mutex };
+use crate::read_to_string;
 use std::fs::OpenOptions;
 use std::io::Write;
 use tokio::time::{ sleep, Duration };
@@ -47,13 +48,28 @@ pub async fn save( state: Arc<Mutex<State>> ) {
         .write_all(market_data_serialized.as_bytes())
         .expect("Failed to write to `assets/market_data.json`! Is the file in use?");
     
-    println!("Succesfully saved! :3");
+    println!("[Succesfully saved! :3]");
 }
 pub async fn autosave( state: Arc<Mutex<State>> ) {
     loop {
         save( state.clone() ).await;
 
         sleep(Duration::from_secs(120)).await;
+    }
+}
+pub async fn autopull( state: Arc<Mutex<State>> ) {
+    loop {
+        println!("[Pulled market data :3]");
+
+        let market_data_contents: String = read_to_string("assets/market_data.json")
+            .expect("Could not find 'assets/market_data.json', please ensure you have created one!");
+    
+        state.lock()
+            .await
+            .market_data = serde_json::from_str(&market_data_contents)
+                .expect("Could not parse the contents of 'market_data.json'!");
+
+        sleep(Duration::from_secs(60)).await;
     }
 }
 pub async fn send_embed( ctx: &Context, msg: &Message, title: &str, description: &str, url: &str ) -> Result<Message, String> {
