@@ -30,7 +30,7 @@ async fn get_and_stringify_potential_profiles(
     url: &str,
     no_special_characters: bool
 ) {
-    let invalid_characters: [char; 4] = [' ', '.', '-', '_'];
+    let invalid_characters: [char; 4] = [' ', '.', '-', '_', '#'];
     let invalid_sites: [&str; 29] = [
         "Oracle", "8tracks", "Coders Rank", "Fiverr",
         "HackerNews", "Modelhub", "metacritic", "xHamster",
