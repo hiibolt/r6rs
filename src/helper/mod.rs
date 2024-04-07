@@ -14,6 +14,7 @@ pub async fn save( state: Arc<Mutex<State>> ) {
         .lock().await
         .bot_data
         .to_string();
+    /*
     let id_list_serialized = serde_json::to_string(&state
         .lock().await
         .id_list)
@@ -22,6 +23,7 @@ pub async fn save( state: Arc<Mutex<State>> ) {
         .lock().await
         .market_data
         .to_string();
+    */
 
     OpenOptions::new()
         .write(true)
@@ -55,13 +57,13 @@ pub async fn autopull( state: Arc<Mutex<State>> ) {
     loop {
         println!("[Pulled market data :3]");
 
-        let market_data_contents: String = read_to_string("assets/market_data.json")
-            .expect("Could not find 'assets/market_data.json', please ensure you have created one!");
+        let market_data_contents: String = read_to_string("assets/data.json")
+            .expect("Could not find 'assets/data.json', please ensure you have created one!");
     
         state.lock()
             .await
             .market_data = serde_json::from_str(&market_data_contents)
-                .expect("Could not parse the contents of 'market_data.json'!");
+                .expect("Could not parse the contents of 'data.json'!");
 
         sleep(Duration::from_secs(60)).await;
     }

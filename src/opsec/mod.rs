@@ -31,13 +31,14 @@ async fn get_and_stringify_potential_profiles(
     no_special_characters: bool
 ) {
     let invalid_characters: [char; 4] = [' ', '.', '-', '_'];
-    let invalid_sites: [&str; 25] = [
+    let invalid_sites: [&str; 28] = [
         "Oracle", "8tracks", "Coders Rank", "Fiverr",
         "HackerNews", "Modelhub", "metacritic", "xHamster",
         "CNET", "YandexMusic", "HackerEarth", "OpenStreetMap", 
         "Pinkbike", "Slides", "Strava", "Archive", "CGTrader",
         "G2G", "NationStates", "IFTTT", "SoylentNews", "hunting",
-        "Contently", "Euw", "OurDJTalk"
+        "Contently", "Euw", "OurDJTalk", "BitCoinForum", "DEXRPG",
+        "Polymart"
     ];
     
     let valid_usernames: Vec<String> = usernames
@@ -114,10 +115,7 @@ fn stringify_profiles( profiles: &Vec<Value>, usernames: &mut Vec<String>, body:
         usernames.push(String::from(username));
         match profile["platformType"].as_str() {
             Some("uplay") => {
-                *body += &format!("### Uplay:\n- {} ({})\n- https://r6.tracker.network/r6/search?name={account_id}&platform=4\n",
-                    username,
-                    account_id
-                    );
+                *body += &format!("### Uplay:\n- {username} ({account_id})\n- https://stats.cc/siege/{username}/{account_id}/playedWith\n- https://r6.tracker.network/r6/search?name={account_id}&platform=4\n");
             },
             Some("steam") => {
                 *body += &format!("**Steam**:\n- https://findsteamid.com/steamid/{}\n- https://steamid.io/lookup/{}\n", profile["idOnPlatform"].as_str().unwrap_or(""), profile["idOnPlatform"].as_str().unwrap_or(""));
