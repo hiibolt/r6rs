@@ -37,7 +37,7 @@ async fn get_and_stringify_potential_profiles(
         "CNET", "YandexMusic", "HackerEarth", "OpenStreetMap", 
         "Pinkbike", "Slides", "Strava", "Archive", "CGTrader",
         "G2G", "NationStates", "IFTTT", "SoylentNews", "hunting",
-        "Contently", "Euw", "OurDJTalk", "BitCoinForum", "hEXRPG",
+        "Contently", "Euw", "OurDJTalk", "BitCoinForum", "HEXRPG",
         "Polymart", "Linktree"
     ];
     
@@ -180,16 +180,18 @@ async fn linked(
     ubisoft_api: Arc<Mutex<UbisoftAPI>>,
     ctx: Context,
     msg: Message,
-    mut args: VecDeque<String>,
+    args: VecDeque<String>,
     platform: String
 ) {
     let mut body = String::new();
     let title = "OPSEC - Uplay Linked Search";
 
     // Ensure input argument
-    let input_option = args
-        .pop_front();
-    if input_option.is_none() {
+    let mut account_id = args
+        .into_iter()
+        .collect::<Vec<String>>()
+        .join(" ");
+    if account_id == "" {
         body += "Please supply an account ID or username!";
 
         send_embed(
@@ -203,8 +205,6 @@ async fn linked(
 
         return;
     }
-    let mut account_id = input_option
-        .expect("Unreachable");
 
     // Ensure that input is an account ID
     match 
