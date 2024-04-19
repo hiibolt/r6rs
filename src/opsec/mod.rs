@@ -31,14 +31,14 @@ async fn get_and_stringify_potential_profiles(
     no_special_characters: bool
 ) {
     let invalid_characters: [char; 5] = [' ', '.', '-', '_', '#'];
-    let invalid_sites: [&str; 29] = [
+    let invalid_sites: [&str; 32] = [
         "Oracle", "8tracks", "Coders Rank", "Fiverr",
         "HackerNews", "Modelhub", "metacritic", "xHamster",
         "CNET", "YandexMusic", "HackerEarth", "OpenStreetMap", 
         "Pinkbike", "Slides", "Strava", "Archive", "CGTrader",
         "G2G", "NationStates", "IFTTT", "SoylentNews", "hunting",
         "Contently", "Euw", "OurDJTalk", "BitCoinForum", "HEXRPG",
-        "Polymart", "Linktree"
+        "Polymart", "Linktree", "GeeksforGeeks", "Kongregate", "RedTube"
     ];
     
     let valid_usernames: Vec<String> = usernames
