@@ -9,6 +9,7 @@ use crate::{ Arc, Mutex };
 use crate::env;
 use tokio::process::{Command};
 use std::process::Stdio;
+use std::collections::HashSet;
 use tokio::io::{BufReader, AsyncBufReadExt};
 
 
@@ -41,25 +42,28 @@ async fn get_and_stringify_potential_profiles(
         "Polymart", "Linktree", "GeeksforGeeks", "Kongregate", "RedTube"
     ];
     
-    let valid_usernames: Vec<String> = usernames
+    let valid_usernames: HashSet<String> = usernames
         .iter()
-        .filter(|username| {
-            !no_special_characters || (!invalid_characters
+        .fold(HashSet::new(), |mut hs, username| {
+            let allow_all: bool = !no_special_characters;
+            let has_invalid_char: bool = !invalid_characters
                 .iter()
-                .any(|&ch| username.contains(ch)) 
-                && 
-            username
+                .any(|&ch| username.contains(ch));
+            let has_alpha_first: bool = username
                 .chars()
                 .next().unwrap_or(' ')
-                .is_alphabetic()
-                &&
-            username.chars().count() < 20)
-        })
-        .map(|st| st.clone())
-        .collect();
+                .is_alphabetic();
+            let within_length: bool = username.chars().count() < 20;
+
+            if allow_all || ( has_invalid_char && has_alpha_first && within_length ) {
+                hs.insert(username.clone());
+            }
+
+            hs
+        });
 
     // Query Sherlock
-    for username in &valid_usernames {
+    for username in valid_usernames.iter() {
         println!("Querying Sherlock for {username}");
         let proxy_link = env::var("PROXY_LINK")
             .expect("Could not find PROXY_LINK in the environment!");
@@ -67,7 +71,7 @@ async fn get_and_stringify_potential_profiles(
         println!("Starting with proxy link:\n\t{proxy_link}");
         
         let mut cmd = Command::new("python")
-            .arg("/sherlock/sherlock")
+            .arg("sherlock/sherlock")
             .arg("--nsfw")
             .arg("--folderoutput")
             .arg("sherlock_output")
@@ -75,6 +79,7 @@ async fn get_and_stringify_potential_profiles(
             .arg("5")
             .arg("--proxy")
             .arg(proxy_link)
+            .arg("--local")
             .arg(&format!("{username}"))
             .stdout(Stdio::piped())
             .spawn()
