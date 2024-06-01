@@ -32,14 +32,15 @@ async fn get_and_stringify_potential_profiles(
     no_special_characters: bool
 ) {
     let invalid_characters: [char; 5] = [' ', '.', '-', '_', '#'];
-    let invalid_sites: [&str; 32] = [
+    let invalid_sites: [&str; 36] = [
         "Oracle", "8tracks", "Coders Rank", "Fiverr",
         "HackerNews", "Modelhub", "metacritic", "xHamster",
         "CNET", "YandexMusic", "HackerEarth", "OpenStreetMap", 
         "Pinkbike", "Slides", "Strava", "Archive", "CGTrader",
         "G2G", "NationStates", "IFTTT", "SoylentNews", "hunting",
         "Contently", "Euw", "OurDJTalk", "BitCoinForum", "HEXRPG",
-        "Polymart", "Linktree", "GeeksforGeeks", "Kongregate", "RedTube"
+        "Polymart", "Linktree", "GeeksforGeeks", "Kongregate", "RedTube",
+        "APClips", "Heavy-R", "RocketTube", "Zhihu"
     ];
     
     let valid_usernames: HashSet<String> = usernames
