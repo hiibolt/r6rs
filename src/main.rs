@@ -5,6 +5,7 @@ mod econ;
 mod help;
 mod helper;
 mod auth;
+mod commands;
 
 use crate::{
     econ::econ,
@@ -18,14 +19,14 @@ use crate::{
 
 use std::{
     env,
-    collections::{ VecDeque },
+    collections::VecDeque,
     fs::read_to_string,
     sync::Arc
 };
 
 use tokio::sync::Mutex;
-use serde_json::{Value};
-use serenity::async_trait;
+use serde_json::Value;
+use serenity::{all::{CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Interaction}, async_trait};
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
@@ -131,13 +132,79 @@ impl EventHandler for Bot {
         }
     }
 
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        if let Interaction::Command(command) = interaction {
+            println!("Received command interaction: {}", command.data.name);
+
+            let content = match command.data.name.as_str() {
+                "announce" => {
+                    let response = commands::announce_all::run(
+                            command.data.options(), 
+                            &ctx, 
+                            self.state.clone()
+                        ).await.expect("Failed to run command!");
+                
+                    Some(response)
+                },
+                "announce_opsec" => {
+                    let response = commands::announce_opsec::run(
+                            command.data.options(), 
+                            &ctx, 
+                            self.state.clone()
+                        ).await.expect("Failed to run command!");
+                
+                    Some(response)
+                },
+                "announce_econ" => {
+                    let response = commands::announce_econ::run(
+                            command.data.options(), 
+                            &ctx, 
+                            self.state.clone()
+                        ).await.expect("Failed to run command!");
+                
+                    Some(response)
+                },
+                _ => Some("not implemented :(".to_string()),
+            };
+
+            if let Some(content) = content {
+                let data = CreateInteractionResponseMessage::new().content(content);
+                let builder = CreateInteractionResponse::Message(data);
+                if let Err(why) = command.create_response(&ctx.http, builder).await {
+                    println!("Cannot respond to slash command: {why}");
+                }
+            }
+        }
+    }
+
     // Set a handler to be called on the `ready` event. This is called when a shard is booted, and
     // a READY payload is sent by Discord. This payload contains data like the current user's guild
     // Ids, current user data, private channels, and more.
     //
     // In this case, just print what the current user's username is.
-    async fn ready(&self, _: Context, ready: Ready) {
+    async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected with data!", ready.user.name);
+
+        let guild_id = GuildId::new(
+            env::var("GUILD_ID")
+                .expect("Expected GUILD_ID in environment")
+                .parse()
+                .expect("GUILD_ID must be an integer"),
+        );
+
+        let commands = guild_id
+            .set_commands(&ctx.http, vec![
+                commands::announce_all::register(),
+                commands::announce_opsec::register(),
+                commands::announce_econ::register(),
+            ])
+            .await.expect("Failed to register guild commands!");
+
+        let command_names = commands
+            .iter()
+            .map(|x| x.name.clone())
+            .collect::<Vec<String>>();
+        println!("I now have the following guild slash commands: {command_names:?}");
     }
 }
 

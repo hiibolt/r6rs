@@ -7,7 +7,7 @@ use crate::UbisoftAPI;
 use crate::Value;
 use crate::{ Arc, Mutex };
 use crate::env;
-use tokio::process::{Command};
+use tokio::process::Command;
 use std::process::Stdio;
 use std::collections::HashSet;
 use tokio::io::{BufReader, AsyncBufReadExt};
