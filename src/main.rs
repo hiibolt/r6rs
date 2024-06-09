@@ -26,10 +26,11 @@ use std::{
 
 use tokio::sync::Mutex;
 use serde_json::Value;
-use serenity::{all::{CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Interaction}, async_trait};
+use serenity::{all::{ActivityData, ActivityType, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Interaction, OnlineStatus}, async_trait};
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
+use url::Url;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -264,6 +265,13 @@ async fn main() {
             ubisoft_api: ubisoft_api,
             state: state
         })
+        .activity(ActivityData {
+            name: String::from("Rainbow Six Siege"),
+            kind: ActivityType::Competing,
+            state: Some(String::from("Powered by Rust and Serenity.")),
+            url: Some(Url::parse("https://github.com/hiibolt/").expect("Hardcoded URL is invalid!"))
+        })
+        .status(OnlineStatus::DoNotDisturb)
         .await.expect("Err creating client");
     
     // Start r6rs
