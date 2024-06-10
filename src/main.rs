@@ -6,6 +6,7 @@ mod help;
 mod helper;
 mod auth;
 mod commands;
+mod snusbase;
 
 use crate::{
     econ::econ,
@@ -24,6 +25,7 @@ use std::{
     sync::Arc
 };
 
+use snusbase::{osint, Snusbase};
 use tokio::sync::Mutex;
 use serde_json::Value;
 use serenity::{all::{ActivityData, ActivityType, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Interaction, OnlineStatus}, async_trait};
@@ -43,6 +45,7 @@ struct State {
 #[derive(Debug)]
 struct Bot {
     ubisoft_api: Arc<Mutex<UbisoftAPI>>,
+    snusbase:    Arc<Mutex<Snusbase>>,
     state:       Arc<Mutex<State>>
 }
 
@@ -97,6 +100,22 @@ impl EventHandler for Bot {
                 // Otherwise, go ahead
                 tokio::spawn(opsec(self.ubisoft_api.clone(), ctx, msg, args)); 
             },
+            "osint" => {
+                // Check if they're not on the whitelist
+                if !self.state
+                    .lock().await
+                    .bot_data["whitelisted_user_ids"]["osint"]
+                    .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!")
+                    .iter()
+                    .any(|x| x.as_u64().expect("User ids need to be numbers!") == user_id)
+                {
+                    no_access( ctx, msg.clone(), "osint", user_id ).await;
+                    return;
+                }
+
+                // Otherwise, go ahead
+                tokio::spawn(osint(self.snusbase.clone(), ctx, msg, args)); 
+            }
             "bans" => {
                 // Check if they're not on the whitelist
                 if !self.state
@@ -237,6 +256,13 @@ async fn main() {
         }
     ));
 
+    // Build the Snusbase API
+    let snusbase = Arc::new(
+        Mutex::new(
+            Snusbase::new().expect("Could not create Snusbase API!")
+        )
+    );
+
     // Build the Ubisoft API and log in
     let ubisoft_api = Arc::new(
         Mutex::new(
@@ -262,7 +288,8 @@ async fn main() {
     let mut client =
         Client::builder(&token, intents)
         .event_handler(Bot {
-            ubisoft_api: ubisoft_api,
+            snusbase,
+            ubisoft_api,
             state: state
         })
         .activity(ActivityData {
