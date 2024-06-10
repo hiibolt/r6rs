@@ -28,9 +28,7 @@ pub async fn run<'a>(
         .cloned()
         .collect::<Vec<Value>>();
 
-    println!("Ids: {:?}", id_list_values);
-
-    let id_list: Vec<serenity::model::id::UserId> = vec!(Value::Number(525429484997050379u64.into()))
+    let id_list: Vec<serenity::model::id::UserId> = id_list_values
         .into_iter()
         .map(|val| serenity::model::id::UserId::new(val.as_u64().expect("At least one user id is not a number!")))
         .collect();
