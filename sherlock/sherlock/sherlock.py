@@ -677,11 +677,11 @@ def main():
         remote_version = str(re.findall('__version__ = "(.*)"', r.text)[0])
         local_version = __version__
 
-        if remote_version != local_version:
-            print(
-                "Update Available!\n"
-                + f"You are running version {local_version}. Version {remote_version} is available at https://github.com/sherlock-project/sherlock"
-            )
+        #if remote_version != local_version:
+        #    print(
+        #        "Update Available!\n"
+        #        + f"You are running version {local_version}. Version {remote_version} is available at https://github.com/sherlock-project/sherlock"
+        #    )
 
     except Exception as error:
         print(f"A problem occurred while checking for an update: {error}")
