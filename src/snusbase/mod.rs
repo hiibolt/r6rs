@@ -1,5 +1,6 @@
 use anyhow::{ Result, Context, bail };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use serenity::all::{CreateAttachment, CreateMessage, Message};
 use tokio::sync::Mutex;
 use std::{collections::{HashMap, VecDeque}, fmt::{self, Display, Formatter}, sync::Arc};
@@ -11,6 +12,12 @@ pub struct SnusbaseResponse {
     took: i32,
     size: i32,
     results: HashMap<String, Vec<HashMap<String, String>>>
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SnusbaseIpResponse {
+    took: i32,
+    size: i32,
+    results: HashMap<String, HashMap<String, Value>>
 }
 impl Display for SnusbaseResponse {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -142,7 +149,7 @@ impl Snusbase {
     pub async fn whois_ip_query (
         &self,
         ips: Vec<String>
-    ) -> Result<SnusbaseResponse> {
+    ) -> Result<SnusbaseIpResponse> {
         if ips.len() == 0 {
             bail!("No IPs to query!");
         }
@@ -161,7 +168,7 @@ impl Snusbase {
             .context("Failed to convert response to string!")?;
         
         // Deserialize response with serde_json
-        let deserialized_resp: SnusbaseResponse = serde_json::from_str(&resp_as_string)
+        let deserialized_resp: SnusbaseIpResponse = serde_json::from_str(&resp_as_string)
             .context("Failed to deserialize response!")?;
         
         Ok(deserialized_resp)
@@ -213,13 +220,13 @@ impl Snusbase {
             false
         ).await
     }
-    pub async fn _get_by_last_ip (
+    pub async fn get_by_last_ip (
         &self,
         last_ip: String
     ) -> Result<SnusbaseResponse> {
         self.database_query(
             vec!(last_ip),
-            vec!(String::from("lastips")),
+            vec!(String::from("lastip")),
             false
         ).await
     }
@@ -288,6 +295,18 @@ pub async fn lookup(
             
             ret
         },
+        "last_ip" => {
+            let mut ret = Err(anyhow::anyhow!("No last IP provided!"));
+
+            if let Some(last_ip) = args.pop_front() {
+                ret = snusbase.lock()
+                    .await
+                    .get_by_last_ip(last_ip)
+                    .await;
+            }
+
+            ret
+        }
         "name" => {
             let mut ret = Err(anyhow::anyhow!("No name provided!"));
 
@@ -390,7 +409,7 @@ pub async fn help (
         &ctx, 
         &msg, 
         "OSINT Help", 
-        "The `osint` command is used to query for information on emails, usernames, IPs, passwords and names.\n\n**Subcommands**:\n- `email` - Query by email\n- `username` - Query by username\n- `ip` - Query by IP\n- `password` - Query by password\n- `name` - Query by name\n\n**Usage**:\n- `osint email <email>`\n- `osint username <username>`\n- `osint ip <ip>`\n- `osint password <password>`\n- `osint name <name>`", 
+        "The `osint` command is used to query for information on emails, usernames, IPs, passwords and names.\n\n**Subcommands**:\n- `email` - Query by email\n- `username` - Query by username\n- `last_ip` Query by IP\n- `password` - Query by password\n- `name` - Query by name\n- `ip` - Geolocate by IP\n\n**Usage**:\n- `osint email <email>`\n- `osint username <username>`\n- `osint ip <ip>`\n- `osint password <password>`\n- `osint name <name>`\n- `osint last_ip <last ip>`", 
         "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
             ).await
                 .unwrap();
@@ -412,11 +431,53 @@ pub async fn osint (
         "username" => {
             tokio::spawn(lookup(snusbase, ctx, msg, args, "username"));
         },
+        "last_ip" => {
+            tokio::spawn(lookup(snusbase, ctx, msg, args, "last_ip"));
+        }
         "ip" => {
-            //snusbase.lock()
-            //    .await
-            //    .whois_ip_query(args.into_iter().collect())
-            //    .await
+            let response = snusbase.lock()
+                .await
+                .whois_ip_query(args.into_iter().collect())
+                .await;
+
+            if response.is_err() {
+                send_embed(
+                    &ctx, 
+                    &msg, 
+                    "An error occured", 
+                    &format!("{}", response.unwrap_err()), 
+                    "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
+                ).await
+                    .unwrap();
+
+                return;
+            }
+
+            let response = response.unwrap();
+
+            let mut message = String::new();
+            for (ip, content) in &response.results {
+                message += &format!("## IP (*{}*):\n", ip);
+
+                for (key, value) in content {
+                    if value.is_string() {
+                        message += &format!("\n- **{}**: {:?}", key, value.as_str().unwrap());
+                    } else if value.is_number() {
+                        message += &format!("\n- **{}**: {:?}", key, value.as_number().unwrap());
+                    } else {
+                        message += &format!("\n- **{}**: {:?}", key, value);
+                    }
+                }
+            }
+
+            send_embed(
+                &ctx, 
+                &msg, 
+                "An error occured", 
+                &message, 
+                "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
+            ).await
+                .unwrap();
         },
         "password" => {
             tokio::spawn(lookup(snusbase, ctx, msg, args, "password"));
