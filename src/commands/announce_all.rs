@@ -41,10 +41,10 @@ pub async fn run<'a>(
     }) = options.get(0) {
         println!("Message: {:?}", message);
         
-        let builder: CreateMessage = CreateMessage::new().content(*message);
-
-        for id in id_list {
+        for id in id_list.iter() {
             println!("Id: {:?}", id);
+
+            let builder: CreateMessage = CreateMessage::new().content(*message);
     
             if let Ok(private_channel) = id.create_dm_channel(ctx.clone())
                 .await {
