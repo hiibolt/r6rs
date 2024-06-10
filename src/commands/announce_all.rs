@@ -41,17 +41,22 @@ pub async fn run<'a>(
     }) = options.get(0) {
         println!("Message: {:?}", message);
         
-        let builder = CreateMessage::new().content(*message);
+        let builder: CreateMessage = CreateMessage::new().content(*message);
 
         for id in id_list {
             println!("Id: {:?}", id);
     
-            id.create_dm_channel(ctx.clone())
-                .await
-                .expect("Failed to send message!")
-                .id
-                .send_message(ctx.clone(), builder.clone())
-                .await.expect("Failed to send message!");
+            if let Ok(private_channel) = id.create_dm_channel(ctx.clone())
+                .await {
+                println!("Channel Id: {:?}", private_channel.id);
+
+                if let Err(e) = private_channel
+                    .id
+                    .send_message(ctx.clone(), builder.clone())
+                    .await {
+                    println!("Error sending message to user: {:?}", e);
+                }
+            }
         }
     }
 
