@@ -26,7 +26,7 @@ use plotpy::{
 
 async fn name_or_item_id( state: Arc<Mutex<State>>, unknown_id: String ) -> Result<String, String> {
     if unknown_id.len() == 0 {
-        return Err(String::from("Missing the `item_id` argument!\n\nRun `r6 econ help` if you're confused."));
+        return Err(String::from("Missing the `item_id` argument!\n\nRun `>>r6 econ help` if you're confused."));
     }
     
     if unknown_id.chars().filter(|&ch| ch.is_ascii_digit() ).count() > 5 {
@@ -340,7 +340,7 @@ async fn help(
         &ctx, 
         &msg, 
         "R6 - Economy - Help", 
-        "**Command List**:\n- `r6 econ analyze <item name | item id>`\n- `r6 econ graph <item name | item id>`\n- `r6 econ profit <purchased at> <item name | item id>`\n- `r6 econ list <(optional) page #>`\n- `r6 econ help`", 
+        "**Command List**:\n- `>>r6 econ analyze <item name | item id>`\n- `>>r6 econ graph <item name | item id>`\n- `>>r6 econ profit <purchased at> <item name | item id>`\n- `>>r6 econ list <(optional) page #>`\n- `>>r6 econ help`", 
         "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
     ).await
         .expect("Failed to send embed!");
@@ -448,7 +448,7 @@ pub async fn econ( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut arg
                 &ctx, 
                 &msg, 
                 "Command does not exist", 
-                &format!("The subcommand `{nonexistant}` is not valid!\n\nConfused?\nRun `r6 econ help` for information on `econ`'s commands\nRun `r6 help` for information on all commands"), 
+                &format!("The subcommand `{nonexistant}` is not valid!\n\nConfused?\nRun `>>r6 econ help` for information on `econ`'s commands\nRun `r6 help` for information on all commands"), 
                 "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
             ).await
                 .unwrap();

@@ -68,7 +68,7 @@ pub async fn help( ctx: Context, msg: Message ) {
         &ctx, 
         &msg, 
         "ADMIN - Help", 
-        &format!("**Command List**:\n- `r6 admin whitelist <section> <user id>`\n- `r6 admin blacklist <section> <user id>`\n- `r6 admin help`"), 
+        &format!("**Command List**:\n- `>>r6 admin whitelist <section> <user id>`\n- `>>r6 admin blacklist <section> <user id>`\n- `>>r6 admin help`"), 
         "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
     ).await.unwrap();
 }
