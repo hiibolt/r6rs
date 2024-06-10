@@ -276,10 +276,6 @@ pub async fn lookup(
             
             ret
         },
-        "ip" => snusbase.lock()
-            .await
-            .whois_ip_query(args.into_iter().collect())
-            .await,
         "password" => {
             let mut ret = Err(anyhow::anyhow!("No password provided!"));
 
@@ -295,10 +291,10 @@ pub async fn lookup(
         "name" => {
             let mut ret = Err(anyhow::anyhow!("No name provided!"));
 
-            if let Some(name) = args.pop_front() {
+            if args.len() > 0 {
                 ret = snusbase.lock()
                     .await
-                    .get_by_name(name)
+                    .get_by_name(args.into_iter().collect::<Vec<String>>().join(" "))
                     .await;
             }
             
@@ -417,7 +413,10 @@ pub async fn osint (
             tokio::spawn(lookup(snusbase, ctx, msg, args, "username"));
         },
         "ip" => {
-            tokio::spawn(lookup(snusbase, ctx, msg, args, "ip"));
+            //snusbase.lock()
+            //    .await
+            //    .whois_ip_query(args.into_iter().collect())
+            //    .await
         },
         "password" => {
             tokio::spawn(lookup(snusbase, ctx, msg, args, "password"));
