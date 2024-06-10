@@ -40,22 +40,16 @@ pub async fn run<'a>(
         ..
     }) = options.get(0) {
         println!("Message: {:?}", message);
-        
+
         for id in id_list.iter() {
             println!("Id: {:?}", id);
 
-            let builder: CreateMessage = CreateMessage::new().content(*message);
-    
-            if let Ok(private_channel) = id.create_dm_channel(ctx.clone())
-                .await {
-                println!("Channel Id: {:?}", private_channel.id);
-
-                if let Err(e) = private_channel
-                    .id
-                    .send_message(ctx.clone(), builder.clone())
-                    .await {
-                    println!("Error sending message to user: {:?}", e);
-                }
+            if let Err(e) = dm_to_person(
+                ctx.clone(),
+                id.clone(),
+                message.to_string()
+            ).await {
+                println!("Error sending message to user: {:?}", e);
             }
         }
     }
@@ -64,7 +58,27 @@ pub async fn run<'a>(
 
     Ok("Successfully sent announcement command!".to_string())
 }
+async fn dm_to_person (
+    ctx: Context,
+    user_id: serenity::model::id::UserId,
+    message: String
+) -> Result<(), serenity::Error> {
+    let builder: CreateMessage = CreateMessage::new().content(message);
 
+    if let Ok(private_channel) = user_id.create_dm_channel(ctx.clone())
+        .await {
+        println!("Channel Id: {:?}", private_channel.id);
+
+        if let Err(e) = private_channel
+            .id
+            .send_message(ctx, builder.clone())
+            .await {
+            println!("Error sending message to user: {:?}", e);
+        }
+    }
+
+    Ok(())
+}
 pub fn register() -> CreateCommand {
     CreateCommand::new("announce")
         .description("Announces to all whitelisted users.")
