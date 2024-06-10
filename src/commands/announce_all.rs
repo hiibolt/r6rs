@@ -28,10 +28,12 @@ pub async fn run<'a>(
         .cloned()
         .collect::<Vec<Value>>();
 
-    let id_list: Vec<serenity::model::id::UserId> = id_list_values
+    let mut id_list: Vec<serenity::model::id::UserId> = id_list_values
         .into_iter()
         .map(|val| serenity::model::id::UserId::new(val.as_u64().expect("At least one user id is not a number!")))
         .collect();
+    id_list.sort();
+    id_list.dedup();
     
     if let Some(ResolvedOption {
         value: ResolvedValue::String(message),
