@@ -32,7 +32,7 @@ async fn get_and_stringify_potential_profiles(
     no_special_characters: bool
 ) {
     let invalid_characters: [char; 5] = [' ', '.', '-', '_', '#'];
-    let invalid_sites: [&str; 36] = [
+    let invalid_sites: [&str; 38] = [
         "Oracle", "8tracks", "Coders Rank", "Fiverr",
         "HackerNews", "Modelhub", "metacritic", "xHamster",
         "CNET", "YandexMusic", "HackerEarth", "OpenStreetMap", 
@@ -40,31 +40,38 @@ async fn get_and_stringify_potential_profiles(
         "G2G", "NationStates", "IFTTT", "SoylentNews", "hunting",
         "Contently", "Euw", "OurDJTalk", "BitCoinForum", "HEXRPG",
         "Polymart", "Linktree", "GeeksforGeeks", "Kongregate", "RedTube",
-        "APClips", "Heavy-R", "RocketTube", "Zhihu"
+        "APClips", "Heavy-R", "RocketTube", "Zhihu", "NitroType", "babyRU"
     ];
-    
-    let valid_usernames: HashSet<String> = usernames
-        .iter()
-        .fold(HashSet::new(), |mut hs, username| {
-            let allow_all: bool = !no_special_characters;
-            let has_invalid_char: bool = !invalid_characters
-                .iter()
-                .any(|&ch| username.contains(ch));
-            let has_alpha_first: bool = username
-                .chars()
-                .next().unwrap_or(' ')
-                .is_alphabetic();
-            let within_length: bool = username.chars().count() < 20;
-
-            if allow_all || ( has_invalid_char && has_alpha_first && within_length ) {
-                hs.insert(username.clone());
-            }
-
-            hs
-        });
 
     // Query Sherlock
-    for username in valid_usernames.iter() {
+    for username in usernames.iter() {
+        let allow_all: bool = !no_special_characters;
+        let has_invalid_char: bool = !invalid_characters
+            .iter()
+            .any(|&ch| username.contains(ch));
+        let has_alpha_first: bool = username
+            .chars()
+            .next().unwrap_or(' ')
+            .is_alphabetic();
+        let within_length: bool = username.chars().count() < 20;
+
+        // If the username is bad, let the user know.
+        if !(allow_all || ( has_invalid_char && has_alpha_first && within_length )) {
+            *body += &format!("\n### {username}\nThis username would cause Sherlock to create poor results.\n\nYou can search it anyway by running the following:\n`r6 opsec namefind {username}`");     
+
+            edit_embed(
+                &ctx,
+                msg,
+                title,
+                &body,
+                url
+            ).await;
+
+            continue;
+        }
+            
+
+
         println!("Querying Sherlock for {username}");
         let proxy_link = env::var("PROXY_LINK")
             .expect("Could not find PROXY_LINK in the environment!");
@@ -90,6 +97,7 @@ async fn get_and_stringify_potential_profiles(
             let stdout_reader = BufReader::new(stdout);
             let mut stdout_lines = stdout_reader.lines();
     
+            *body += &format!("\n### {username}\n");
             while let Ok(Some(output)) = stdout_lines.next_line().await {
                 if invalid_sites
                         .iter()
@@ -100,7 +108,7 @@ async fn get_and_stringify_potential_profiles(
                 if output.contains("http") || output.contains("https") {
                     println!("Found site for {username}: {output}");
                 }
-                *body += &format!("\n{}", output);            
+                *body += &format!("\n{output}");            
                 edit_embed(
                     &ctx,
                     msg,
