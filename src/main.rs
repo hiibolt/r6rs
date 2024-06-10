@@ -59,46 +59,79 @@ impl EventHandler for Bot {
             .collect();
         let user_id: u64 = msg.author.id.get();
 
-        if args.pop_front() != Some(String::from("r6")) {
-            return;
-        }
-
-        match args
-            .pop_front()
-            .unwrap_or(String::from("help"))
-            .as_str()
-        {
-            "econ" => {
-                // Check if they're not on the whitelist
-                if !self.state
-                    .lock().await
-                    .bot_data["whitelisted_user_ids"]["econ"]
-                    .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!")
-                    .iter()
-                    .any(|x| x.as_u64().expect("User ids need to be numbers!") == user_id)
+        match args.pop_front().unwrap().as_str() {
+            "r6" => {
+                match args
+                    .pop_front()
+                    .unwrap_or(String::from("help"))
+                    .as_str()
                 {
-                    no_access( ctx, msg.clone(), "econ", user_id ).await;
-                    return;
-                }
+                    "econ" => {
+                        // Check if they're not on the whitelist
+                        if !self.state
+                            .lock().await
+                            .bot_data["whitelisted_user_ids"]["econ"]
+                            .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!")
+                            .iter()
+                            .any(|x| x.as_u64().expect("User ids need to be numbers!") == user_id)
+                        {
+                            no_access( ctx, msg.clone(), "econ", user_id ).await;
+                            return;
+                        }
 
-                // Otherwise, go ahead
-                tokio::spawn(econ(self.state.clone(), ctx, msg, args));
-            },
-            "opsec" => {
-                // Check if they're not on the whitelist
-                if !self.state
-                    .lock().await
-                    .bot_data["whitelisted_user_ids"]["opsec"]
-                    .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!")
-                    .iter()
-                    .any(|x| x.as_u64().expect("User ids need to be numbers!") == user_id)
-                {
-                    no_access( ctx, msg.clone(), "opsec", user_id ).await;
-                    return;
-                }
+                        // Otherwise, go ahead
+                        tokio::spawn(econ(self.state.clone(), ctx, msg, args));
+                    },
+                    "opsec" => {
+                        // Check if they're not on the whitelist
+                        if !self.state
+                            .lock().await
+                            .bot_data["whitelisted_user_ids"]["opsec"]
+                            .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!")
+                            .iter()
+                            .any(|x| x.as_u64().expect("User ids need to be numbers!") == user_id)
+                        {
+                            no_access( ctx, msg.clone(), "opsec", user_id ).await;
+                            return;
+                        }
 
-                // Otherwise, go ahead
-                tokio::spawn(opsec(self.ubisoft_api.clone(), ctx, msg, args)); 
+                        // Otherwise, go ahead
+                        tokio::spawn(opsec(self.ubisoft_api.clone(), ctx, msg, args)); 
+                    },
+                    "bans" => {
+                        // Check if they're not on the whitelist
+                        if !self.state
+                            .lock().await
+                            .bot_data["whitelisted_user_ids"]["bans"]
+                            .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!")
+                            .iter()
+                            .any(|x| x.as_u64().expect("User ids need to be numbers!") == user_id)
+                        {
+                            no_access( ctx, msg.clone(), "bans", user_id ).await;
+                            return;
+                        }
+
+                        // Otherwise, go ahead
+                        tokio::spawn(bans(ctx, msg, args));
+                    },
+                    "admin" => {
+                        // Check if they're not on the whitelist
+                        if !self.state
+                            .lock().await
+                            .bot_data["whitelisted_user_ids"]["admin"]
+                            .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!")
+                            .iter()
+                            .any(|x| x.as_u64().expect("User ids need to be numbers!") == user_id)
+                        {
+                            no_access( ctx, msg.clone(), "admin", user_id ).await;
+                            return;
+                        }
+
+                        // Otherwise, go ahead
+                        tokio::spawn(admin( self.state.clone(), ctx, msg, args ));
+                    },
+                    _ => { tokio::spawn(help(ctx, msg)); }
+                }
             },
             "osint" => {
                 // Check if they're not on the whitelist
@@ -116,39 +149,7 @@ impl EventHandler for Bot {
                 // Otherwise, go ahead
                 tokio::spawn(osint(self.snusbase.clone(), ctx, msg, args)); 
             }
-            "bans" => {
-                // Check if they're not on the whitelist
-                if !self.state
-                    .lock().await
-                    .bot_data["whitelisted_user_ids"]["bans"]
-                    .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!")
-                    .iter()
-                    .any(|x| x.as_u64().expect("User ids need to be numbers!") == user_id)
-                {
-                    no_access( ctx, msg.clone(), "bans", user_id ).await;
-                    return;
-                }
-
-                // Otherwise, go ahead
-                tokio::spawn(bans(ctx, msg, args));
-            },
-            "admin" => {
-                // Check if they're not on the whitelist
-                if !self.state
-                    .lock().await
-                    .bot_data["whitelisted_user_ids"]["admin"]
-                    .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!")
-                    .iter()
-                    .any(|x| x.as_u64().expect("User ids need to be numbers!") == user_id)
-                {
-                    no_access( ctx, msg.clone(), "admin", user_id ).await;
-                    return;
-                }
-
-                // Otherwise, go ahead
-                tokio::spawn(admin( self.state.clone(), ctx, msg, args ));
-            },
-            _ => { tokio::spawn(help(ctx, msg)); }
+            _ => { }
         }
     }
 
