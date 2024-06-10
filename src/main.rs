@@ -6,7 +6,7 @@ mod help;
 mod helper;
 mod auth;
 mod commands;
-mod snusbase;
+mod osint;
 
 use crate::{
     econ::econ,
@@ -25,7 +25,7 @@ use std::{
     sync::Arc
 };
 
-use snusbase::{osint, Snusbase};
+use osint::{osint, BulkVS, Snusbase};
 use tokio::sync::Mutex;
 use serde_json::Value;
 use serenity::{all::{ActivityData, ActivityType, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Interaction, OnlineStatus}, async_trait};
@@ -46,6 +46,7 @@ struct State {
 struct Bot {
     ubisoft_api: Arc<Mutex<UbisoftAPI>>,
     snusbase:    Arc<Mutex<Snusbase>>,
+    bulkvs:      Arc<Mutex<BulkVS>>,
     state:       Arc<Mutex<State>>
 }
 
@@ -59,7 +60,13 @@ impl EventHandler for Bot {
             .collect();
         let user_id: u64 = msg.author.id.get();
 
-        match args.pop_front().unwrap().as_str() {
+        let front_arg = args.pop_front().unwrap();
+
+        if &front_arg.chars().take(2).collect::<String>() != ">>" {
+            return;
+        }
+
+        match front_arg.chars().skip(2).collect::<String>().as_str() {
             "r6" => {
                 match args
                     .pop_front()
@@ -147,9 +154,9 @@ impl EventHandler for Bot {
                 }
 
                 // Otherwise, go ahead
-                tokio::spawn(osint(self.snusbase.clone(), ctx, msg, args)); 
+                tokio::spawn(osint(self.snusbase.clone(), self.bulkvs.clone(), ctx, msg, args)); 
             }
-            _ => { }
+            _ => { tokio::spawn(help(ctx, msg)); }
         }
     }
 
@@ -264,6 +271,13 @@ async fn main() {
         )
     );
 
+    // Build the BulkVS API
+    let bulkvs = Arc::new(
+        Mutex::new(
+            BulkVS::new().expect("Could not create BulkVS API!")
+        )
+    );
+
     // Build the Ubisoft API and log in
     let ubisoft_api = Arc::new(
         Mutex::new(
@@ -290,11 +304,12 @@ async fn main() {
         Client::builder(&token, intents)
         .event_handler(Bot {
             snusbase,
+            bulkvs,
             ubisoft_api,
-            state: state
+            state
         })
         .activity(ActivityData {
-            name: String::from("Rainbow Six Siege"),
+            name: String::from("serverspace"),
             kind: ActivityType::Competing,
             state: Some(String::from("Powered by Rust and Serenity.")),
             url: Some(Url::parse("https://github.com/hiibolt/").expect("Hardcoded URL is invalid!"))

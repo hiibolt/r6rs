@@ -7,6 +7,42 @@ use std::{collections::{HashMap, VecDeque}, fmt::{self, Display, Formatter}, syn
 
 use crate::helper::send_embed;
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct BulkVSPhoneNumberResponse {
+    pub name: Option<String>,
+    pub number: Option<String>,
+    pub time: Option<i64>
+}
+#[derive(Debug)]
+pub struct BulkVS {
+    api_key: String,
+}
+impl BulkVS {
+    pub fn new () -> Result<Self> {
+        Ok(Self {
+            api_key: std::env::var("BULKVS_API_KEY")
+                .context("Couldn't find API key in environment! Be sure to set `BULKVS_API_KEY`.")?
+        })
+    }
+    pub fn query_phone_number ( &self, phone_number: &str ) -> Result<BulkVSPhoneNumberResponse> {
+        let path = format!(
+            "https://cnam.bulkvs.com/?id={}&did={}&format=json",
+            self.api_key,
+            phone_number);
+
+        let resp_object = ureq::get(&path)
+            .call()
+            .context("Failed to query Snusbase!")?;
+
+        let resp_object_string = resp_object.into_string()
+            .context("Failed to convert response into string!")?;
+
+        let resp_deserialized = serde_json::from_str(&resp_object_string)
+            .context("Failed to deserialize response!")?;
+
+        Ok(resp_deserialized)
+    }
+}
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SnusbaseResponse {
     took: i32,
@@ -409,13 +445,14 @@ pub async fn help (
         &ctx, 
         &msg, 
         "OSINT Help", 
-        "The `osint` command is used to query for information on emails, usernames, IPs, passwords and names.\n\n**Subcommands**:\n- `email` - Query by email\n- `username` - Query by username\n- `last_ip` Query by IP\n- `password` - Query by password\n- `name` - Query by name\n- `ip` - Geolocate by IP\n\n**Usage**:\n- `osint email <email>`\n- `osint username <username>`\n- `osint ip <ip>`\n- `osint password <password>`\n- `osint name <name>`\n- `osint last_ip <last ip>`", 
+        "The `osint` command is used to query for information on emails, usernames, IPs, passwords and names.\n\n**Subcommands**:\n- `email` - Query by email\n- `username` - Query by username\n- `last_ip` Query by IP\n- `password` - Query by password\n- `name` - Query by name\n- `ip` - Geolocate by IP\n- `phone` - Perform CNAM lookup\n\n**Usage**:\n- `osint email <email>`\n- `osint username <username>`\n- `osint ip <ip>`\n- `osint password <password>`\n- `osint name <name>`\n- `osint last_ip <last ip>`\n- `>>osint phone <phone number>`", 
         "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
             ).await
                 .unwrap();
 }
 pub async fn osint ( 
     snusbase: Arc<Mutex<Snusbase>>,
+    bulkvs: Arc<Mutex<BulkVS>>,
     ctx: serenity::client::Context,
     msg: Message,
     mut args: VecDeque<String> 
@@ -433,7 +470,60 @@ pub async fn osint (
         },
         "last_ip" => {
             tokio::spawn(lookup(snusbase, ctx, msg, args, "last_ip"));
-        }
+        },
+        "phone" => {
+            if let Some(phone_number) = args.pop_front() {
+                let response = bulkvs.lock()
+                    .await
+                    .query_phone_number(&phone_number);
+
+                if response.is_err() {
+                    send_embed(
+                        &ctx, 
+                        &msg, 
+                        "An error occured", 
+                        &format!("{}", response.unwrap_err()), 
+                        "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
+                    ).await
+                        .unwrap();
+    
+                    return;
+                }
+
+                let response = response.unwrap();
+    
+                let mut message = String::new();
+                if let Some(name) = response.name {
+                    message += &format!("\n- **Name**: {name}");
+                }
+                if let Some(number) = response.number {
+                    message += &format!("\n- **Number**: {number}");
+                }
+                if let Some(time) = response.time {
+                    message += &format!("\n- **Time**: {time}");
+                }
+
+                send_embed(
+                    &ctx, 
+                    &msg, 
+                    "CNAM Lookup", 
+                    &message, 
+                    "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
+                ).await
+                    .unwrap();
+
+                return;
+            }
+            
+            send_embed(
+                &ctx, 
+                &msg, 
+                "An error occured", 
+                "Missing phone number!", 
+                "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
+            ).await
+                .unwrap();
+        },
         "ip" => {
             let response = snusbase.lock()
                 .await
@@ -473,7 +563,7 @@ pub async fn osint (
             send_embed(
                 &ctx, 
                 &msg, 
-                "An error occured", 
+                "IP Lookup", 
                 &message, 
                 "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
             ).await
