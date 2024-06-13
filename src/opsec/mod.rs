@@ -57,7 +57,7 @@ async fn get_and_stringify_potential_profiles(
 
         // If the username is bad, let the user know.
         if !(allow_all || ( has_invalid_char && has_alpha_first && within_length )) {
-            *body += &format!("\n### {username}\nThis username would cause Sherlock to create poor results.\n\nYou can search it anyway by running the following:\n`r6 opsec namefind {username}`");     
+            *body += &format!("\n### {username}\nThis username would cause Sherlock to create poor results.\n\nYou can search it anyway by running the following:\n`>>r6 opsec namefind {username}`");     
 
             edit_embed(
                 &ctx,
