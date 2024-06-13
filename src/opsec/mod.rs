@@ -8,6 +8,7 @@ use crate::Value;
 use crate::{ Arc, Mutex };
 use crate::env;
 use tokio::process::Command;
+use std::collections::HashSet;
 use std::process::Stdio;
 use tokio::io::{BufReader, AsyncBufReadExt};
 
@@ -22,7 +23,7 @@ async fn get_profiles( ubisoft_api: Arc<Mutex<UbisoftAPI>>, account_id: &str ) -
         .as_array()?.clone())
 }
 async fn get_and_stringify_potential_profiles( 
-    usernames: &Vec<String>, 
+    usernames: &HashSet<String>, 
     ctx: &Context, 
     msg: &mut Message, 
     title: &str, 
@@ -120,12 +121,17 @@ async fn get_and_stringify_potential_profiles(
         cmd.wait().await.unwrap();
     }
 } 
-fn stringify_profiles( profiles: &Vec<Value>, usernames: &mut Vec<String>, body: &mut String, account_id: &String ) {
+fn stringify_profiles(
+    profiles: &Vec<Value>,
+    usernames: &mut HashSet<String>,
+    body: &mut String,
+    account_id: &String
+) {
     for profile in profiles {
         let username = profile["nameOnPlatform"]
             .as_str()
             .unwrap_or("");
-        usernames.push(String::from(username));
+        usernames.insert(String::from(username));
         match profile["platformType"].as_str() {
             Some("uplay") => {
                 *body += &format!("### Uplay:\n- {username} ({account_id})\n- https://stats.cc/siege/{username}/{account_id}/playedWith\n- https://r6.tracker.network/r6/search?name={account_id}&platform=4\n");
@@ -260,7 +266,7 @@ async fn linked(
     }
     let profiles = profiles_option
         .expect("Unreachable");
-    let mut usernames: Vec<String> = Vec::new();
+    let mut usernames: HashSet<String> = HashSet::new();
     
     body += "## ⛓️ Linked Profiles\n";
     stringify_profiles( &profiles, &mut usernames, &mut body, &account_id );
@@ -294,7 +300,7 @@ async fn namefind(
     let title = "OPSEC - Namefind";
 
     // Ensure argument
-    let usernames: Vec<String> = args
+    let usernames: HashSet<String> = args
         .into_iter()
         .collect();
     if usernames.len() == 0 {
