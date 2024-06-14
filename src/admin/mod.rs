@@ -1,3 +1,4 @@
+use crate::helper::get_random_anime_girl;
 use crate::VecDeque;
 use crate::Message;
 use crate::Context;
@@ -69,7 +70,7 @@ pub async fn help( ctx: Context, msg: Message ) {
         &msg, 
         "ADMIN - Help", 
         &format!("**Command List**:\n- `>>r6 admin whitelist <section> <user id>`\n- `>>r6 admin blacklist <section> <user id>`\n- `>>r6 admin help`"), 
-        "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+        get_random_anime_girl()
     ).await.unwrap();
 }
 pub async fn admin( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut args: VecDeque<String> ) {
@@ -88,7 +89,7 @@ pub async fn admin( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut ar
                             &msg, 
                             "Admin - Whitelist Success", 
                             &format!("Successfully added person to section!"), 
-                            "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+                            get_random_anime_girl()
                         ).await.unwrap();
                     },
                     Err(err) => {
@@ -98,7 +99,7 @@ pub async fn admin( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut ar
                             &msg, 
                             "Admin - Whitelist Error", 
                             &format!("Failed for reason \"{err}\""), 
-                            "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+                            get_random_anime_girl()
                         ).await.unwrap();
                     }
                 }
@@ -114,7 +115,7 @@ pub async fn admin( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut ar
                             &msg, 
                             "Success", 
                             &format!("Successfully removed person from section, if they existed!"), 
-                            "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+                            get_random_anime_girl()
                         ).await.unwrap();
                     },
                     Err(err) => {
@@ -124,7 +125,7 @@ pub async fn admin( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut ar
                             &msg, 
                             "Admin - Blacklist Error", 
                             &format!("Failed for reason \"{err}\""), 
-                            "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+                            get_random_anime_girl()
                         ).await.unwrap();
                     }
                 }
@@ -139,7 +140,7 @@ pub async fn admin( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut ar
                 &msg, 
                 "Command does not exist", 
                 &format!("The command **{nonexistant}** is not valid!\n\n**Valid commands**:\nrecent\nwatch\nunwatch\nwatchlist"), 
-                "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+                get_random_anime_girl()
             ).await
                 .unwrap();
         }

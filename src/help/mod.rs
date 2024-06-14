@@ -1,3 +1,4 @@
+use crate::helper::get_random_anime_girl;
 use crate::Message;
 use crate::Context;
 use crate::send_embed;
@@ -15,7 +16,7 @@ pub async fn help(
             "**OSINT Command List**:\n- `>>osint email <email>`\n- `>>osint username <username>`\n- `>>osint ip <ip>`\n- `>>osint password <password>`\n- `>>osint name <name>`\n- `>>osint last_ip <last_ip>`\n- `>>osint phone <phone number>`\n\n" +
             "**Ban Watch Command List**:\n- **Still under development, stay cozy...**\n\n" +
             "**Admin Command List**:\n- `>>r6 admin whitelist <section> <user id>`\n- `>>r6 admin blacklist <section> <user id>`\n- `>>r6 admin help`\n\n\n*Developed by @hiibolt on GitHub*"),
-        "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+            get_random_anime_girl()
     ).await
         .expect("Failed to send embed!");
 }

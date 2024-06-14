@@ -1,3 +1,4 @@
+use crate::helper::get_random_anime_girl;
 use crate::{ 
     Message,
     Context,
@@ -341,7 +342,7 @@ async fn help(
         &msg, 
         "R6 - Economy - Help", 
         "**Command List**:\n- `>>r6 econ analyze <item name | item id>`\n- `>>r6 econ graph <item name | item id>`\n- `>>r6 econ profit <purchased at> <item name | item id>`\n- `>>r6 econ list <(optional) page #>`\n- `>>r6 econ help`", 
-        "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+        get_random_anime_girl()
     ).await
         .expect("Failed to send embed!");
 }
@@ -359,7 +360,7 @@ pub async fn econ( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut arg
                 &msg, 
                 "Tracked Skins", 
                 &result, 
-                "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+                get_random_anime_girl()
             ).await
                 .unwrap();
         },
@@ -367,7 +368,7 @@ pub async fn econ( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut arg
             let (body, title, item_img) = data( state, args )
                 .await
                 .unwrap_or_else(|err| 
-                    (err, String::from("Error!"), String::from("https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"))
+                    (err, String::from("Error!"), String::from(get_random_anime_girl()))
                 );
             
             send_embed(
@@ -408,7 +409,7 @@ pub async fn econ( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut arg
                         &msg, 
                         "Error!", 
                         &err_msg, 
-                        "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+                        get_random_anime_girl()
                     ).await
                         .expect("Failed to send embed! Probably a perms thing.");
                 }
@@ -434,7 +435,7 @@ pub async fn econ( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut arg
                         &msg, 
                         "Error!", 
                         &err_msg, 
-                        "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+                        get_random_anime_girl()
                     ).await
                         .expect("Failed to send embed!");
                 }
@@ -449,7 +450,7 @@ pub async fn econ( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut arg
                 &msg, 
                 "Command does not exist", 
                 &format!("The subcommand `{nonexistant}` is not valid!\n\nConfused?\nRun `>>r6 econ help` for information on `econ`'s commands\nRun `r6 help` for information on all commands"), 
-                "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+                get_random_anime_girl()
             ).await
                 .unwrap();
         }

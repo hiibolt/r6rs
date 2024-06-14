@@ -8,6 +8,7 @@ use std::io::Write;
 use tokio::time::{ sleep, Duration };
 use serenity::all::EditMessage;
 use serenity::all::{ CreateEmbed, CreateMessage };
+use rand::prelude::SliceRandom;
 
 pub async fn save( state: Arc<Mutex<State>> ) {
     let bot_data_serialized = &state
@@ -94,7 +95,7 @@ pub async fn unimplemented( ctx: Context, msg: Message, cmd: &str ) {
         &msg, 
         "Not yet implemented!", 
         &format!("The command **{cmd}** exists but is not yet implemented! While I work, stay cozy :3"), 
-        "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+        get_random_anime_girl()
     ).await
         .unwrap();
 }
@@ -104,7 +105,19 @@ pub async fn no_access( ctx: Context, msg: Message, cmd: &str, id: u64 ) {
         &msg, 
         "You don't have access to this command!", 
         &format!("You (**@{id}**) aren't authorized to use **{cmd}**.\n\n*Contact @hiibolt to purchase access or if this is in error.*"), 
-        "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+        get_random_anime_girl()
     ).await
         .unwrap();
+}
+pub fn get_random_anime_girl() -> &'static str {
+    let anime_girl_links = [
+        "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4",
+        "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4",
+        "https://github.com/hiibolt/hiibolt/assets/91273156/9098eb3f-d883-4a8b-8c6b-525869eac2a2",
+        "https://github.com/hiibolt/hiibolt/assets/91273156/d8891401-df14-435b-89a5-c23da4c38354",
+        "https://github.com/hiibolt/hiibolt/assets/91273156/353dea2e-f436-4289-9a10-37f9a23e3ee6",
+        "https://github.com/hiibolt/hiibolt/assets/91273156/b3cf1ffd-874b-403c-9716-dce4d4f03ae0"
+    ];
+
+    anime_girl_links.choose(&mut rand::thread_rng()).unwrap()
 }

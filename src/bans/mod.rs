@@ -1,3 +1,4 @@
+use crate::helper::get_random_anime_girl;
 use crate::VecDeque;
 use crate::Message;
 use crate::Context;
@@ -28,7 +29,7 @@ pub async fn bans( ctx: Context, msg: Message, mut args: VecDeque<String> ) {
                 &msg, 
                 "Command does not exist", 
                 &format!("The command **{nonexistant}** is not valid!\n\n**Valid commands**:\nrecent\nwatch\nunwatch\nwatchlist"), 
-                "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+                get_random_anime_girl()
             ).await
                 .unwrap();
         }

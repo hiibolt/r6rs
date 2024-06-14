@@ -5,7 +5,7 @@ use serenity::all::{CreateAttachment, CreateMessage, Message};
 use tokio::sync::Mutex;
 use std::{collections::{HashMap, VecDeque}, fmt::{self, Display, Formatter}, sync::Arc};
 
-use crate::helper::send_embed;
+use crate::helper::{get_random_anime_girl, send_embed};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct BulkVSPhoneNumberResponse {
@@ -364,7 +364,7 @@ pub async fn lookup(
             &msg, 
             "An error occured", 
             &format!("{}", snusbase_response_result.unwrap_err()), 
-            "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
+            get_random_anime_girl()
         ).await
             .unwrap();
 
@@ -388,7 +388,7 @@ pub async fn lookup(
             &msg, 
             "OSINT DUMP", 
             "There were more than 10 results, which in total contains more data than Discord can display.\n\nA full dump will be attached below shortly!", 
-            "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
+            get_random_anime_girl()
         ).await
             .unwrap();
 
@@ -413,7 +413,7 @@ pub async fn lookup(
             &msg, 
             "No results", 
             "Nothing were found for the given query!\n\nThere were no errors, but there weren't any results either.", 
-            "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
+            get_random_anime_girl()
             ).await
                 .unwrap();
         
@@ -442,7 +442,7 @@ pub async fn lookup(
                 &msg, 
                 "OSINT DUMP - Via Email", 
                 &message, 
-                "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
+                get_random_anime_girl()
             ).await
                 .unwrap();
         }
@@ -457,7 +457,7 @@ pub async fn help (
         &msg, 
         "OSINT Help", 
         "The `osint` command is used to query for information on emails, usernames, IPs, passwords and names.\n\n**Subcommands**:\n- `email` - Query by email\n- `username` - Query by username\n- `last_ip` Query by IP\n- `password` - Query by password\n- `name` - Query by name\n- `ip` - Geolocate by IP\n- `phone` - Perform CNAM lookup\n\n**Usage**:\n- `>>osint email <email>`\n- `>>osint username <username>`\n- `>>osint ip <ip>`\n- `>>osint password <password>`\n- `>>osint name <name>`\n- `>>osint last_ip <last ip>`\n- `>>osint phone <phone number>`", 
-        "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
+        get_random_anime_girl()
             ).await
                 .unwrap();
 }
@@ -494,7 +494,7 @@ pub async fn osint (
                         &msg, 
                         "An error occured", 
                         &format!("{}", response.unwrap_err()), 
-                        "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
+                        get_random_anime_girl()
                     ).await
                         .unwrap();
     
@@ -519,7 +519,7 @@ pub async fn osint (
                     &msg, 
                     "CNAM Lookup", 
                     &message, 
-                    "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
+                    get_random_anime_girl()
                 ).await
                     .unwrap();
 
@@ -531,7 +531,7 @@ pub async fn osint (
                 &msg, 
                 "An error occured", 
                 "Missing phone number!", 
-                "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
+                get_random_anime_girl()
             ).await
                 .unwrap();
         },
@@ -547,7 +547,7 @@ pub async fn osint (
                     &msg, 
                     "An error occured", 
                     &format!("{}", response.unwrap_err()), 
-                    "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
+                    get_random_anime_girl()
                 ).await
                     .unwrap();
 
@@ -576,7 +576,7 @@ pub async fn osint (
                 &msg, 
                 "IP Lookup", 
                 &message, 
-                "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
+                get_random_anime_girl()
             ).await
                 .unwrap();
         },
@@ -595,7 +595,7 @@ pub async fn osint (
                 &msg, 
                 "Command does not exist", 
                 &format!("The subcommand `{nonexistant}` is not valid!\n\nConfused?\nRun `osint help` for information on `osint`'s commands\nRun `r6 help` for information on all commands"), 
-                "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4"
+                get_random_anime_girl()
             ).await
                 .unwrap();
         }

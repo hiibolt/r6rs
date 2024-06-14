@@ -1088,6 +1088,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.0",
  "plotpy",
+ "rand",
  "reqwest",
  "serde",
  "serde_json",
