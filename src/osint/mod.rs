@@ -372,8 +372,15 @@ pub async fn lookup(
     }
 
     let snusbase_response = snusbase_response_result.expect("unreachable");
+    
+    let mut number_of_entries: i32 = 0;
+    for map in snusbase_response.results.values() {
+        for _ in map.iter() {
+            number_of_entries += 1;
+        }
+    }
 
-    if snusbase_response.results.len() > 10 {
+    if number_of_entries > 10 {
         let full_dump = format!("{}", snusbase_response);
 
         send_embed(
@@ -413,18 +420,22 @@ pub async fn lookup(
         return;
     }
 
-    let len = snusbase_response.results.len();
+    let number_of_sources = snusbase_response.results.len();
     for (ind, (dump, content)) in snusbase_response.results.iter().take(10).enumerate() {
+        let number_of_dumps = content.len();
+        
+        let mut dump_ind = 0;
         for entry in content {
             let mut message = String::new();
+            dump_ind += 1;
             
-            message += &format!("## Dump {}/{len}\n(From `{}`):\n", ind + 1, dump);
+            message += &format!("## Source {}/{number_of_sources} - Dump {dump_ind}/{number_of_dumps}\n", ind + 1);
 
             for (key, value) in entry {
                 message += &format!("- **{}**: {}\n", key, value);
             }
             
-            message += "\n";
+            message += &format!("\n(From `{}`):\n", dump);
 
             send_embed(
                 &ctx, 
