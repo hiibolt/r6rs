@@ -147,7 +147,7 @@ async fn get_and_stringify_potential_profiles(
             .collect::<Vec<String>>()
             .join("\n");
 
-        *body += "\n\nThese usernames would produce poor results from Sherlock. You can always run them manually with:\n`>>r6 opsec namefind <username>` :)";
+        *body += "\n\nThese usernames would produce poor results from Sherlock. You can always run them manually with the following command :)\n`>>r6 opsec namefind <username>`";
 
         edit_embed(
             &ctx,
