@@ -7,11 +7,11 @@ use tokio::time::{ sleep, Duration };
 use crate::{ Arc, Mutex };
 
 #[derive(Debug)]
-pub struct UbisoftAPI {
+pub struct Ubisoft {
     token: String,
     headers: HeaderMap
 }
-impl UbisoftAPI {
+impl Ubisoft {
     fn get_basic_token ( email: String, password: String ) -> String {
         BASE64_STANDARD
             .encode(format!("{}:{}", email, password))
@@ -59,7 +59,7 @@ impl UbisoftAPI {
 
         Ok(())
     }
-    pub async fn auto_login( state: Arc<Mutex<UbisoftAPI>> ) {
+    pub async fn auto_login( state: Arc<Mutex<Ubisoft>> ) {
         loop {
             state
                 .lock().await

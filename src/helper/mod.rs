@@ -15,16 +15,6 @@ pub async fn save( state: Arc<Mutex<State>> ) {
         .lock().await
         .bot_data
         .to_string();
-    /*
-    let id_list_serialized = serde_json::to_string(&state
-        .lock().await
-        .id_list)
-        .expect("Failed to serialize ID list! Potentially unreachable?");
-    let market_data_serialized = &state
-        .lock().await
-        .market_data
-        .to_string();
-    */
 
     OpenOptions::new()
         .write(true)
@@ -34,16 +24,6 @@ pub async fn save( state: Arc<Mutex<State>> ) {
         .expect("Failed to open file handle to `assets/bot_data.json`! Does the file exist?")
         .write_all(bot_data_serialized.as_bytes())
         .expect("Failed to write to `assets/bot_data.json`! Is the file in use?");
-    /*
-    OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open("assets/ids.json")
-        .expect("Failed to open file handle to `assets/ids.json`! Does the file exist?")
-        .write_all(id_list_serialized.as_bytes())
-        .expect("Failed to write to `assets/ids.json`! Is the file in use?");
-    */
 
     println!("[Succesfully saved! :3]");
 }
@@ -89,7 +69,7 @@ pub async fn edit_embed( ctx: &Context, msg: &mut Message, title: &str, descript
 
     msg.edit(ctx, edit_builder).await.unwrap();
 }
-pub async fn unimplemented( ctx: Context, msg: Message, cmd: &str ) {
+pub async fn _unimplemented( ctx: Context, msg: Message, cmd: &str ) {
     send_embed(
         &ctx, 
         &msg, 
@@ -110,14 +90,12 @@ pub async fn no_access( ctx: Context, msg: Message, cmd: &str, id: u64 ) {
         .unwrap();
 }
 pub fn get_random_anime_girl() -> &'static str {
-    let anime_girl_links = [
+    [
         "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4",
         "https://github.com/hiibolt/hiibolt/assets/91273156/831e2922-cdcb-409d-a919-1a72fbe56ff4",
         "https://github.com/hiibolt/hiibolt/assets/91273156/9098eb3f-d883-4a8b-8c6b-525869eac2a2",
         "https://github.com/hiibolt/hiibolt/assets/91273156/d8891401-df14-435b-89a5-c23da4c38354",
         "https://github.com/hiibolt/hiibolt/assets/91273156/353dea2e-f436-4289-9a10-37f9a23e3ee6",
         "https://github.com/hiibolt/hiibolt/assets/91273156/b3cf1ffd-874b-403c-9716-dce4d4f03ae0"
-    ];
-
-    anime_girl_links.choose(&mut rand::thread_rng()).unwrap()
+    ].choose(&mut rand::thread_rng()).expect("Unreachable!")
 }

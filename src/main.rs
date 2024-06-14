@@ -1,21 +1,12 @@
-mod opsec;
-mod admin;
-mod bans;
-mod econ;
-mod help;
 mod helper;
-mod auth;
 mod commands;
-mod osint;
+mod sections;
+mod apis;
 
 use crate::{
-    econ::econ,
-    opsec::opsec,
-    bans::bans,
-    admin::admin,
-    help::help,
-    helper::{ no_access, unimplemented, send_embed },
-    auth::UbisoftAPI
+    sections::{ econ, opsec, admin, osint },
+    helper::{ no_access, send_embed, get_random_anime_girl },
+    apis::{ Snusbase, BulkVS, Ubisoft }
 };
 
 use std::{
@@ -25,7 +16,6 @@ use std::{
     sync::Arc
 };
 
-use osint::{osint, BulkVS, Snusbase};
 use tokio::sync::Mutex;
 use serde_json::Value;
 use serenity::{all::{ActivityData, ActivityType, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Interaction, OnlineStatus}, async_trait};
@@ -44,7 +34,7 @@ struct State {
 
 #[derive(Debug)]
 struct Bot {
-    ubisoft_api: Arc<Mutex<UbisoftAPI>>,
+    ubisoft_api: Arc<Mutex<Ubisoft>>,
     snusbase:    Arc<Mutex<Snusbase>>,
     bulkvs:      Arc<Mutex<BulkVS>>,
     state:       Arc<Mutex<State>>
@@ -104,22 +94,6 @@ impl EventHandler for Bot {
 
                         // Otherwise, go ahead
                         tokio::spawn(opsec(self.ubisoft_api.clone(), ctx, msg, args)); 
-                    },
-                    "bans" => {
-                        // Check if they're not on the whitelist
-                        if !self.state
-                            .lock().await
-                            .bot_data["whitelisted_user_ids"]["bans"]
-                            .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!")
-                            .iter()
-                            .any(|x| x.as_u64().expect("User ids need to be numbers!") == user_id)
-                        {
-                            no_access( ctx, msg.clone(), "bans", user_id ).await;
-                            return;
-                        }
-
-                        // Otherwise, go ahead
-                        tokio::spawn(bans(ctx, msg, args));
                     },
                     "admin" => {
                         // Check if they're not on the whitelist
@@ -192,6 +166,15 @@ impl EventHandler for Bot {
                 
                     Some(response)
                 },
+                "announce_osint" => {
+                    let response = commands::announce_osint::run(
+                            command.data.options(), 
+                            &ctx, 
+                            self.state.clone()
+                        ).await.expect("Failed to run command!");
+                
+                    Some(response)
+                },
                 _ => Some("not implemented :(".to_string()),
             };
 
@@ -225,6 +208,7 @@ impl EventHandler for Bot {
                 commands::announce_all::register(),
                 commands::announce_opsec::register(),
                 commands::announce_econ::register(),
+                commands::announce_osint::register()
             ])
             .await.expect("Failed to register guild commands!");
 
@@ -234,6 +218,23 @@ impl EventHandler for Bot {
             .collect::<Vec<String>>();
         println!("I now have the following guild slash commands: {command_names:?}");
     }
+}
+pub async fn help( 
+    ctx: Context,
+    msg: Message 
+) {
+    let _ = send_embed(
+        &ctx, 
+        &msg, 
+        "All Sections - Help", 
+        &(String::from("**R6 Economy Command List**:\n- `>>r6 econ analyze <item name | item id>`\n- `>>r6 econ graph <item name | item id>`\n- `>>r6 econ profit <purchased at> <item name | item id>`\n- `>>r6 econ list <(optional) page #>`\n- `>>r6 econ help`\n\n") +
+            "**R6 OPSEC Command List**:\n- `>>r6 opsec <pc | xbox | psn> <account name>`\n- `>>r6 opsec namefind <username1> <username2> ...`\n- `>>r6 opsec help`\n\n" +
+            "**OSINT Command List**:\n- `>>osint email <email>`\n- `>>osint username <username>`\n- `>>osint ip <ip>`\n- `>>osint password <password>`\n- `>>osint name <name>`\n- `>>osint last_ip <last_ip>`\n- `>>osint phone <phone number>`\n\n" +
+            "**Ban Watch Command List**:\n- **Still under development, stay cozy...**\n\n" +
+            "**Admin Command List**:\n- `>>r6 admin whitelist <section> <user id>`\n- `>>r6 admin blacklist <section> <user id>`\n- `>>r6 admin help`\n\n\n*Developed by @hiibolt on GitHub*"),
+            get_random_anime_girl()
+    ).await
+        .expect("Failed to send embed!");
 }
 
 #[tokio::main]
@@ -281,7 +282,7 @@ async fn main() {
     // Build the Ubisoft API and log in
     let ubisoft_api = Arc::new(
         Mutex::new(
-            UbisoftAPI::new(
+            Ubisoft::new(
                 env::var("UBISOFT_AUTH_EMAIL")
                     .expect("Could not find UBISOFT_AUTH_EMAIL in the environment!"),
                 env::var("UBISOFT_AUTH_PW")
@@ -291,7 +292,7 @@ async fn main() {
     );
 
     // Start login process
-    tokio::spawn(UbisoftAPI::auto_login( ubisoft_api.clone()));
+    tokio::spawn(Ubisoft::auto_login( ubisoft_api.clone()));
 
     // Start autosave
     tokio::spawn(helper::autosave( state.clone() ));

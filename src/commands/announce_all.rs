@@ -17,14 +17,19 @@ pub async fn run<'a>(
         .bot_data["whitelisted_user_ids"]["econ"].clone();
     let opsec_id_list_value = state.lock().await
         .bot_data["whitelisted_user_ids"]["opsec"].clone();
+    let osint_id_list_value = state.lock().await
+        .bot_data["whitelisted_user_ids"]["osint"].clone();
     let econ_id_list_vec = econ_id_list_value
         .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!");
     let opsec_id_list_vec = opsec_id_list_value
+        .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!");
+    let osint_id_list_vec = osint_id_list_value
         .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!");
 
     let id_list_values = econ_id_list_vec
         .into_iter()
         .chain(opsec_id_list_vec.into_iter())
+        .chain(osint_id_list_vec.into_iter())
         .cloned()
         .collect::<Vec<Value>>();
 

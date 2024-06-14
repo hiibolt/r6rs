@@ -1,9 +1,10 @@
+use crate::helper::get_random_anime_girl;
 use crate::VecDeque;
 use crate::Message;
 use crate::Context;
 use crate::send_embed;
 use crate::helper::edit_embed;
-use crate::UbisoftAPI;
+use crate::Ubisoft;
 use crate::Value;
 use crate::{ Arc, Mutex };
 use crate::env;
@@ -13,7 +14,10 @@ use std::process::Stdio;
 use tokio::io::{BufReader, AsyncBufReadExt};
 
 
-async fn get_profiles( ubisoft_api: Arc<Mutex<UbisoftAPI>>, account_id: &str ) -> Option<Vec<Value>> {
+async fn get_profiles(
+    ubisoft_api: Arc<Mutex<Ubisoft>>,
+    account_id: &str
+) -> Option<Vec<Value>> {
     let profiles: Value = ubisoft_api
         .lock().await
         .basic_request(format!("https://public-ubiservices.ubi.com/v3/users/{account_id}/profiles"))
@@ -43,7 +47,9 @@ async fn get_and_stringify_potential_profiles(
         "APClips", "Heavy-R", "RocketTube", "Zhihu", "NitroType", "babyRU"
     ];
 
-    // Query Sherlock
+    let mut invalid_usernames = HashSet::new();
+    let mut valid_usernames = HashSet::new();
+
     for username in usernames.iter() {
         let allow_all: bool = !no_special_characters;
         let has_invalid_char: bool = !invalid_characters
@@ -57,21 +63,16 @@ async fn get_and_stringify_potential_profiles(
 
         // If the username is bad, let the user know.
         if !(allow_all || ( has_invalid_char && has_alpha_first && within_length )) {
-            *body += &format!("\n### {username}\nThis username would cause Sherlock to create poor results.\n\nYou can search it anyway by running the following:\n`>>r6 opsec namefind {username}`");     
-
-            edit_embed(
-                &ctx,
-                msg,
-                title,
-                &body,
-                url
-            ).await;
+            invalid_usernames.insert(username.clone());
 
             continue;
         }
-            
 
+        valid_usernames.insert(username.clone());
+    }
 
+    // Query Sherlock
+    for username in valid_usernames.iter() {
         println!("Querying Sherlock for {username}");
         let proxy_link = env::var("PROXY_LINK")
             .expect("Could not find PROXY_LINK in the environment!");
@@ -98,6 +99,8 @@ async fn get_and_stringify_potential_profiles(
             let mut stdout_lines = stdout_reader.lines();
     
             *body += &format!("\n### {username}\n");
+
+            let mut found = false;
             while let Ok(Some(output)) = stdout_lines.next_line().await {
                 if invalid_sites
                         .iter()
@@ -105,10 +108,25 @@ async fn get_and_stringify_potential_profiles(
                 {
                     continue;
                 }
+
                 if output.contains("http") || output.contains("https") {
                     println!("Found site for {username}: {output}");
+
+                    found = true;
+
+                    *body += &format!("\n{output}");            
+                    edit_embed(
+                        &ctx,
+                        msg,
+                        title,
+                        &body,
+                        url
+                    ).await;
                 }
-                *body += &format!("\n{output}");            
+            }
+
+            if !found {
+                *body += &format!("\nNo results found for {username}");
                 edit_embed(
                     &ctx,
                     msg,
@@ -119,6 +137,25 @@ async fn get_and_stringify_potential_profiles(
             }
         }
         cmd.wait().await.unwrap();
+    }
+    
+    if invalid_usernames.len() > 0 {
+        *body += "\n### Ignored Usernames\n";
+        
+        *body += &invalid_usernames.into_iter()
+            .map(|username| format!("- {username}"))
+            .collect::<Vec<String>>()
+            .join("\n");
+
+        *body += "\n\nThese usernames would produce poor results from Sherlock. You can always run them manually with:\n`>>r6 opsec namefind <username>` :)";
+
+        edit_embed(
+            &ctx,
+            msg,
+            title,
+            &body,
+            url
+        ).await;
     }
 } 
 fn stringify_profiles(
@@ -196,7 +233,7 @@ fn stringify_profiles(
     }
 }
 async fn linked(
-    ubisoft_api: Arc<Mutex<UbisoftAPI>>,
+    ubisoft_api: Arc<Mutex<Ubisoft>>,
     ctx: Context,
     msg: Message,
     args: VecDeque<String>,
@@ -218,7 +255,7 @@ async fn linked(
             &msg, 
             title, 
             &body, 
-            "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+            get_random_anime_girl()
         ).await
             .unwrap();
 
@@ -353,7 +390,7 @@ async fn help(
         .expect("Failed to send embed!");
 }
 pub async fn opsec( 
-    ubisoft_api: Arc<Mutex<UbisoftAPI>>,
+    ubisoft_api: Arc<Mutex<Ubisoft>>,
     ctx: Context,
     msg: Message,
     mut args: VecDeque<String> 
