@@ -32,7 +32,7 @@ impl BulkVS {
 
         let resp_object = ureq::get(&path)
             .call()
-            .context("Failed to query Snusbase!")?;
+            .map_err(|e| anyhow::anyhow!("Failed to query CNAM lookup backend! {:?}", e))?;
 
         let resp_object_string = resp_object.into_string()
             .context("Failed to convert response into string!")?;
@@ -197,7 +197,7 @@ impl Snusbase {
             .send_json(ureq::json!({
                 "terms": ips
             }))
-            .context("Failed to query Snusbase!")?;
+            .map_err(|e| anyhow::anyhow!("Failed to query IP geolocation backend! {:?}", e))?;
 
         // Debug print response
         let resp_as_string = resp_object.into_string()
@@ -224,7 +224,7 @@ impl Snusbase {
                 "types": types,
                 "wildcard": wildcard
             }))
-            .context("Failed to query Snusbase!")?;
+            .map_err(|e| anyhow::anyhow!("Failed to query database query backend! {:?}", e))?;
 
         // Debug print response
         let resp_as_string = resp_object.into_string()
