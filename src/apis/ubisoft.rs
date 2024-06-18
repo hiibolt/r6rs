@@ -99,7 +99,7 @@ impl Ubisoft {
         }
     }
     pub async fn get_applications ( &mut self, account_id: String ) -> Result<Value> {
-        self.basic_request(format!("https://public-ubiservices.ubi.com/v1/profiles/applications?profileIds={account_id}&spaceIds=45d58365-547f-4b45-ab5b-53ed14cc79ed"))
+        self.basic_request(format!("https://public-ubiservices.ubi.com/v2/profiles/applications?profileIds={account_id}&spaceIds=45d58365-547f-4b45-ab5b-53ed14cc79ed"))
             .await
             .map_err(|err| anyhow!("{:?}", err))
     }
