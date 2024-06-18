@@ -314,7 +314,7 @@ pub async fn osint (
                 &ctx, 
                 &msg, 
                 "Command does not exist", 
-                &format!("The subcommand `{nonexistant}` is not valid!\n\nConfused?\nRun `osint help` for information on `osint`'s commands\nRun `r6 help` for information on all commands"), 
+                &format!("The subcommand `{nonexistant}` is not valid!\n\nConfused?\nRun `>>osint help` for information on `osint`'s commands\nRun `r6 help` for information on all commands"), 
                 get_random_anime_girl()
             ).await
                 .unwrap();

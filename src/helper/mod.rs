@@ -1,5 +1,4 @@
 use crate::Message;
-use crate::Context;
 use crate::State;
 use crate::{ Arc, Mutex };
 use crate::read_to_string;
@@ -49,7 +48,13 @@ pub async fn autopull( state: Arc<Mutex<State>> ) {
         sleep(Duration::from_secs(60)).await;
     }
 }
-pub async fn send_embed( ctx: &Context, msg: &Message, title: &str, description: &str, url: &str ) -> Result<Message, String> {
+pub async fn send_embed(
+    ctx: &serenity::client::Context,
+    msg: &Message,
+    title: &str,
+    description: &str,
+    url: &str
+) -> Result<Message, String> {
     let embed = CreateEmbed::new()
         .title(title)
         .description(description)
@@ -60,7 +65,13 @@ pub async fn send_embed( ctx: &Context, msg: &Message, title: &str, description:
     msg.channel_id.send_message(&ctx.http, builder).await.map_err(|e| format!("{e:?}"))
         .map_err(|_| String::from("Failed to send error!s"))
 }
-pub async fn edit_embed( ctx: &Context, msg: &mut Message, title: &str, description: &str, url: &str ) {
+pub async fn edit_embed(
+    ctx: &serenity::client::Context,
+    msg: &mut Message,
+    title: &str,
+    description: &str,
+    url: &str
+) {
     let embed_builder = CreateEmbed::new()
         .title(title)
         .description(description)
@@ -69,7 +80,11 @@ pub async fn edit_embed( ctx: &Context, msg: &mut Message, title: &str, descript
 
     msg.edit(ctx, edit_builder).await.unwrap();
 }
-pub async fn _unimplemented( ctx: Context, msg: Message, cmd: &str ) {
+pub async fn _unimplemented(
+    ctx: serenity::client::Context,
+    msg: Message,
+    cmd: &str
+) {
     send_embed(
         &ctx, 
         &msg, 
@@ -79,7 +94,12 @@ pub async fn _unimplemented( ctx: Context, msg: Message, cmd: &str ) {
     ).await
         .unwrap();
 }
-pub async fn no_access( ctx: Context, msg: Message, cmd: &str, id: u64 ) {
+pub async fn no_access(
+    ctx: serenity::client::Context,
+    msg: Message,
+    cmd: &str,
+    id: u64
+) {
     send_embed(
         &ctx, 
         &msg, 

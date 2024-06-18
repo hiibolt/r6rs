@@ -5,6 +5,7 @@ use std::error::Error;
 use reqwest::StatusCode;
 use tokio::time::{ sleep, Duration };
 use crate::{ Arc, Mutex };
+use anyhow::{ Result, bail, anyhow, Context };
 
 #[derive(Debug)]
 pub struct Ubisoft {
@@ -19,6 +20,8 @@ impl Ubisoft {
 
     pub fn new ( email: String, password: String ) -> Self {
         let token = Self::get_basic_token( email.clone(), password.clone() );
+
+        println!("Token: {token}");
 
         Self {
             token,
@@ -69,7 +72,7 @@ impl Ubisoft {
         }
     }
 
-    pub async fn basic_request ( &mut self, url: String ) -> Result<Value, Box<dyn Error>> {
+    pub async fn basic_request ( &mut self, url: String ) -> Result<Value> {
         let client = reqwest::Client::new();
 
         let request = client.get(&url)
@@ -82,20 +85,31 @@ impl Ubisoft {
                 .error_for_status() 
         {
             Ok(response) => {
-                Ok(serde_json::from_str(&response.text().await?)?)
+                let json = serde_json::from_str(
+                        &response.text().await
+                            .context("Failed to extract text for basic request!")?
+                    )
+                    .context("Failed to unwrap JSON for basic request!")?;
+
+                Ok(json)
             },
             Err(err) => {
-                println!("Request to {url} may have failed for reason {err}");
-                Err(Box::new(err))
+                bail!("Request to {url} may have failed for reason {err}");
             }
         }
     }
-    pub async fn get_account_id ( &mut self, account_id: String, platform: String ) -> Option<String> {
+    pub async fn get_applications ( &mut self, account_id: String ) -> Result<Value> {
+        self.basic_request(format!("https://public-ubiservices.ubi.com/v1/profiles/applications?profileIds={account_id}&spaceIds=45d58365-547f-4b45-ab5b-53ed14cc79ed"))
+            .await
+            .map_err(|err| anyhow!("{:?}", err))
+    }
+    pub async fn get_account_id ( &mut self, account_id: String, platform: String ) -> Result<String> {
         if account_id.len() < 20 {
             let result = self
                 .basic_request(
                     format!("https://public-ubiservices.ubi.com/v3/profiles?nameOnPlatform={}&platformType={}", account_id, platform)
-                ).await.ok()?;
+                ).await
+                .context("Failed to ask Ubi for profile ID!")?;
                 
             return result.get("profiles")
                 .and_then(|val| {
@@ -107,8 +121,9 @@ impl Ubisoft {
                                         .and_then(|st| Some(String::from(st)))
                                 })
                         })
-                });
+                })
+                .ok_or(anyhow!("Couldn't locate ID in response!"));
         }
-        Some(account_id)
+        Ok(account_id)
     }
 }

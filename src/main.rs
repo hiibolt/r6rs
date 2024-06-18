@@ -24,6 +24,7 @@ use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 use url::Url;
 use std::collections::HashMap;
+use anyhow::Result;
 
 #[derive(Debug)]
 struct State {
@@ -42,7 +43,11 @@ struct Bot {
 
 #[async_trait]
 impl EventHandler for Bot {
-    async fn message(&self, ctx: Context, msg: Message) {
+    async fn message(
+        &self, 
+        ctx: serenity::client::Context, 
+        msg: Message
+    ) {
         let mut args: VecDeque<String> = msg.content
             .clone()
             .split(' ')
@@ -134,7 +139,11 @@ impl EventHandler for Bot {
         }
     }
 
-    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+    async fn interaction_create(
+        &self, 
+        ctx: serenity::client::Context, 
+        interaction: Interaction
+    ) {
         if let Interaction::Command(command) = interaction {
             println!("Received command interaction: {}", command.data.name);
 
@@ -175,6 +184,15 @@ impl EventHandler for Bot {
                 
                     Some(response)
                 },
+                "development" => {
+                    let response = commands::development::run(
+                            command.data.options(), 
+                            &ctx, 
+                            self.ubisoft_api.clone()
+                        ).await.expect("Failed to run command!");
+                
+                    Some(response)
+                },
                 _ => Some("not implemented :(".to_string()),
             };
 
@@ -193,7 +211,7 @@ impl EventHandler for Bot {
     // Ids, current user data, private channels, and more.
     //
     // In this case, just print what the current user's username is.
-    async fn ready(&self, ctx: Context, ready: Ready) {
+    async fn ready(&self, ctx: serenity::client::Context, ready: Ready) {
         println!("{} is connected with data!", ready.user.name);
 
         let guild_id = GuildId::new(
@@ -208,7 +226,8 @@ impl EventHandler for Bot {
                 commands::announce_all::register(),
                 commands::announce_opsec::register(),
                 commands::announce_econ::register(),
-                commands::announce_osint::register()
+                commands::announce_osint::register(),
+                commands::development::register()
             ])
             .await.expect("Failed to register guild commands!");
 
@@ -220,7 +239,7 @@ impl EventHandler for Bot {
     }
 }
 pub async fn help( 
-    ctx: Context,
+    ctx: serenity::client::Context,
     msg: Message 
 ) {
     let _ = send_embed(
@@ -238,7 +257,7 @@ pub async fn help(
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     // Get intents and token
     let token = env::var("DISCORD_BOT_TOKEN").expect("Expected a token in the environment");
     let intents = GatewayIntents::GUILD_MESSAGES
@@ -312,7 +331,7 @@ async fn main() {
         .activity(ActivityData {
             name: String::from("serverspace"),
             kind: ActivityType::Competing,
-            state: Some(String::from("Powered by Rust and Serenity.")),
+            state: Some(String::from("Written and maintained by @hiibolt on GitHub.")),
             url: Some(Url::parse("https://github.com/hiibolt/").expect("Hardcoded URL is invalid!"))
         })
         .status(OnlineStatus::DoNotDisturb)
@@ -322,4 +341,6 @@ async fn main() {
     if let Err(why) = client.start().await {
         println!("Client error: {why:?}");
     }
+
+    Ok(())
 }

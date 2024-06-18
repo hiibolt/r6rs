@@ -1,7 +1,6 @@
 use crate::helper::get_random_anime_girl;
 use crate::VecDeque;
 use crate::Message;
-use crate::Context;
 use crate::send_embed;
 use crate::State;
 use crate::{ Arc, Mutex };
@@ -64,7 +63,7 @@ pub async fn blacklist( state: Arc<Mutex<State>>, mut args: VecDeque<String> ) -
 
     Ok(())
 }
-pub async fn help( ctx: Context, msg: Message ) {
+pub async fn help( ctx: serenity::client::Context, msg: Message ) {
     send_embed(
         &ctx, 
         &msg, 
@@ -73,7 +72,7 @@ pub async fn help( ctx: Context, msg: Message ) {
         get_random_anime_girl()
     ).await.unwrap();
 }
-pub async fn admin( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut args: VecDeque<String> ) {
+pub async fn admin( state: Arc<Mutex<State>>, ctx: serenity::client::Context, msg: Message, mut args: VecDeque<String> ) {
     match args
         .pop_front()
         .unwrap_or(String::from("help"))

@@ -1,8 +1,5 @@
 use crate::helper::get_random_anime_girl;
-use crate::{ 
-    Message,
-    Context,
-};
+use crate::Message;
 use serenity::all::{
     CreateMessage,
     CreateEmbed,
@@ -334,7 +331,7 @@ async fn profit(
     Ok((msg, item_asset_url.to_owned()))
 }
 async fn help(
-    ctx: Context,
+    ctx: serenity::client::Context,
     msg: Message
 ) {
     let _ = send_embed(
@@ -346,7 +343,7 @@ async fn help(
     ).await
         .expect("Failed to send embed!");
 }
-pub async fn econ( state: Arc<Mutex<State>>, ctx: Context, msg: Message, mut args: VecDeque<String> ) {
+pub async fn econ( state: Arc<Mutex<State>>, ctx: serenity::client::Context, msg: Message, mut args: VecDeque<String> ) {
     match args
         .pop_front()
         .unwrap_or(String::from("help"))

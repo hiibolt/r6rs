@@ -1,13 +1,13 @@
 use crate::helper::get_random_anime_girl;
 use crate::VecDeque;
 use crate::Message;
-use crate::Context;
 use crate::send_embed;
 use crate::helper::edit_embed;
 use crate::Ubisoft;
 use crate::Value;
 use crate::{ Arc, Mutex };
 use crate::env;
+use anyhow::{ Result, anyhow };
 use tokio::process::Command;
 use std::collections::HashSet;
 use std::process::Stdio;
@@ -28,7 +28,7 @@ async fn get_profiles(
 }
 async fn get_and_stringify_potential_profiles( 
     usernames: &HashSet<String>, 
-    ctx: &Context, 
+    ctx: &serenity::client::Context, 
     msg: &mut Message, 
     title: &str, 
     body: &mut String, 
@@ -234,7 +234,7 @@ fn stringify_profiles(
 }
 async fn linked(
     ubisoft_api: Arc<Mutex<Ubisoft>>,
-    ctx: Context,
+    ctx: serenity::client::Context,
     msg: Message,
     args: VecDeque<String>,
     platform: String
@@ -268,10 +268,10 @@ async fn linked(
             .lock().await
             .get_account_id(account_id.clone(), platform).await
     {
-        Some(id) => {
+        Ok(id) => {
             account_id = String::from(id);
         }
-        None => {
+        Err(_) => {
             body += &format!("Account **{account_id}** does not exist!");
 
             send_embed(
@@ -328,8 +328,143 @@ async fn linked(
         true
     ).await;
 }
+async fn applications(
+    ubisoft_api: Arc<Mutex<Ubisoft>>,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String>
+) {
+    let mut body = String::new();
+    let title = "OPSEC - Applications";
+
+    if args.len() == 0 {
+        body += "Please supply an account ID or username!";
+
+        send_embed(
+            &ctx, 
+            &msg, 
+            title, 
+            &body, 
+            get_random_anime_girl()
+        ).await
+            .unwrap();
+
+        return;
+    }
+
+    // Ensure input argument
+    let mut account_id = args
+        .into_iter()
+        .collect::<Vec<String>>()
+        .join(" ");
+    if account_id == "" {
+        body += "Please supply an account ID or username!";
+
+        send_embed(
+            &ctx, 
+            &msg, 
+            title, 
+            &body, 
+            get_random_anime_girl()
+        ).await
+            .unwrap();
+
+        return;
+    }
+
+    // Ensure that input is an account ID
+    match 
+        ubisoft_api
+            .lock().await
+            .get_account_id(account_id.clone(), String::from("uplay")).await
+    {
+        Ok(id) => {
+            account_id = String::from(id);
+        }
+        Err(_) => {
+            body += &format!("Account **{account_id}** does not exist!");
+
+            send_embed(
+                &ctx, 
+                &msg, 
+                title, 
+                &body, 
+                "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+            ).await
+                .unwrap();
+
+            return;
+        }
+    }
+
+    let res = ubisoft_api.lock().await
+        .get_applications(account_id.clone()).await
+        .expect("Failed to get applications!");
+
+    match serialize_applications_response( &res ) {
+        Ok(applications) => {
+            body += &format!("## 📱 Applications\n\n");
+
+            body += &applications;
+        }
+        Err(err) => {
+            body += &format!("\nEncountered an error while fetching applications! \n{err}");
+
+            send_embed(
+                &ctx, 
+                &msg, 
+                title, 
+                &body, 
+                "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+            ).await
+                .unwrap();
+        }
+    }
+
+    send_embed(
+        &ctx, 
+        &msg, 
+        title, 
+        &body, 
+        &format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png")
+    ).await
+        .unwrap();
+
+    println!("Result: {res}");
+}
+fn serialize_applications_response (
+    res: &Value
+) -> Result<String> {
+    let mut body = String::new();
+
+    let applications = res.get("applications")
+        .ok_or(anyhow!("Failed to get applications!"))?
+        .as_array()
+        .ok_or(anyhow!("Failed to get applications!"))?;
+
+    for application_value in applications {
+        let application = application_value
+            .as_object()
+            .ok_or(anyhow!("Failed to get application!"))?;
+
+        let app_id = application.get("appId")
+            .and_then(|val| val.as_str())
+            .unwrap_or("Unknown");
+
+        body += &format!("### {app_id}\n");
+
+        for (key, value) in application {
+            if key == "appId" {
+                continue;
+            }
+            body += &format!("**{key}**: {value}\n");
+        }
+    }
+
+    Ok(body)
+}
 async fn namefind( 
-    ctx: Context,
+    ctx: serenity::client::Context,
     msg: Message,
     args: VecDeque<String>
 ) { 
@@ -377,7 +512,7 @@ async fn namefind(
     ).await;   
 }
 async fn help(
-    ctx: Context,
+    ctx: serenity::client::Context,
     msg: Message
 ) {
     let _ = send_embed(
@@ -391,7 +526,7 @@ async fn help(
 }
 pub async fn opsec( 
     ubisoft_api: Arc<Mutex<Ubisoft>>,
-    ctx: Context,
+    ctx: serenity::client::Context,
     msg: Message,
     mut args: VecDeque<String> 
 ) {
@@ -409,6 +544,9 @@ pub async fn opsec(
         "psn" => {
             tokio::spawn(linked( ubisoft_api, ctx, msg, args, String::from("psn") ));
         },
+        "applications" => {
+            tokio::spawn(applications( ubisoft_api, ctx, msg, args ));
+        }, 
         "namefind" => {
             tokio::spawn(namefind( ctx, msg, args ));
         },
