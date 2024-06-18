@@ -435,6 +435,11 @@ async fn applications(
 fn serialize_applications_response (
     res: &Value
 ) -> Result<String> {
+    let application_ids = std::collections::HashMap::from([
+        ("f68a4bb5-608a-4ff2-8123-be8ef797e0a6", "Rainbow Six Siege - PC (Ubisoft Connect)"),
+        ("e3d5ea9e-50bd-43b7-88bf-39794f4e3d40", "Rainbow Six Siege - TTS (Ubisoft Connect)")
+    ]);
+    
     let mut body = String::new();
 
     let applications = res.get("applications")
@@ -451,7 +456,11 @@ fn serialize_applications_response (
             .and_then(|val| val.as_str())
             .unwrap_or("Unknown");
 
-        body += &format!("### {app_id}\n");
+        if let Some(app_name) = application_ids.get(app_id) {
+            body += &format!("### {app_name}\n");
+        } else {
+            body += &format!("### Unknown ({app_id})\n");
+        }
 
         for (key, value) in application {
             if key == "appId" {
