@@ -247,7 +247,7 @@ pub async fn help(
         &msg, 
         "All Sections - Help", 
         &(String::from("**R6 Economy Command List**:\n- `>>r6 econ analyze <item name | item id>`\n- `>>r6 econ graph <item name | item id>`\n- `>>r6 econ profit <purchased at> <item name | item id>`\n- `>>r6 econ list <(optional) page #>`\n- `>>r6 econ help`\n\n") +
-            "**R6 OPSEC Command List**:\n- `>>r6 opsec <pc | xbox | psn> <account name>`\n- `>>r6 opsec namefind <username1> <username2> ...`\n- `>>r6 opsec help`\n\n" +
+            "**R6 OPSEC Command List**:\n- `>>r6 opsec <pc | xbox | psn> <account name>`\n- `>>r6 opsec namefind <username1> <username2> ...`\n- `>>r6 opsec applications <pc uplay>`\n- `>>r6 opsec help`\n\n" +
             "**OSINT Command List**:\n- `>>osint email <email>`\n- `>>osint username <username>`\n- `>>osint ip <ip>`\n- `>>osint password <password>`\n- `>>osint name <name>`\n- `>>osint last_ip <last_ip>`\n- `>>osint phone <phone number>`\n\n" +
             "**Ban Watch Command List**:\n- **Still under development, stay cozy...**\n\n" +
             "**Admin Command List**:\n- `>>r6 admin whitelist <section> <user id>`\n- `>>r6 admin blacklist <section> <user id>`\n- `>>r6 admin help`\n\n\n*Developed by @hiibolt on GitHub*"),
