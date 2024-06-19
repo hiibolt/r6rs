@@ -528,7 +528,7 @@ async fn help(
         &ctx, 
         &msg, 
         "R6 - OPSEC - Help", 
-        "**Command List**:\n- `>>r6 opsec <pc | xbox | psn> <account name>`\n- `>>r6 opsec namefind <username1> <username2> ...`\n-`>>r6 opsec applications <pc uplay>`\n- `>>r6 opsec help`", 
+        "**Command List**:\n- `>>r6 opsec <pc | xbox | psn> <account name>`\n- `>>r6 opsec namefind <username1> <username2> ...`\n- `>>r6 opsec applications <pc uplay>`\n- `>>r6 opsec help`", 
         "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
     ).await
         .expect("Failed to send embed!");
