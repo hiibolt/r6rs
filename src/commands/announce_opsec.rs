@@ -1,10 +1,11 @@
 use std::sync::Arc;
-use serenity::all::{CommandOptionType, Context, CreateCommandOption, CreateMessage, ResolvedValue};
+use serenity::all::{CommandOptionType, Context, CreateCommandOption, ResolvedValue};
 use tokio::sync::Mutex;
 
 use serenity::builder::CreateCommand;
 use serenity::model::application::ResolvedOption;
 
+use crate::commands::dm_to_person;
 use crate::State;
 
 pub async fn run<'a>(
@@ -28,18 +29,17 @@ pub async fn run<'a>(
         ..
     }) = options.get(0) {
         println!("Message: {:?}", message);
-        
-        let builder = CreateMessage::new().content(*message);
 
         for id in id_list {
             println!("Id: {:?}", id);
     
-            id.create_dm_channel(ctx.clone())
-                .await
-                .expect("Failed to send message!")
-                .id
-                .send_message(ctx.clone(), builder.clone())
-                .await.expect("Failed to send message!");
+            if let Err(e) = dm_to_person(
+                ctx.clone(),
+                id.clone(),
+                message.to_string()
+            ).await {
+                println!("Error sending message to user: {:?}", e);
+            }
         }
     }
 

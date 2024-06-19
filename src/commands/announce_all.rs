@@ -1,12 +1,10 @@
 use std::sync::Arc;
 use serde_json::Value;
-use serenity::all::{CommandOptionType, Context, CreateCommandOption, CreateMessage, ResolvedValue};
+use serenity::all::{CommandOptionType, Context, CreateCommand, CreateCommandOption, ResolvedValue};
 use tokio::sync::Mutex;
-
-use serenity::builder::CreateCommand;
 use serenity::model::application::ResolvedOption;
 
-use crate::State;
+use crate::{commands::dm_to_person, State};
 
 pub async fn run<'a>(
     options: Vec<ResolvedOption<'a>>,
@@ -58,32 +56,9 @@ pub async fn run<'a>(
             }
         }
     }
-
-    
-
     Ok("Successfully sent announcement command!".to_string())
 }
-async fn dm_to_person (
-    ctx: Context,
-    user_id: serenity::model::id::UserId,
-    message: String
-) -> Result<(), serenity::Error> {
-    let builder: CreateMessage = CreateMessage::new().content(message);
 
-    if let Ok(private_channel) = user_id.create_dm_channel(ctx.clone())
-        .await {
-        println!("Channel Id: {:?}", private_channel.id);
-
-        if let Err(e) = private_channel
-            .id
-            .send_message(ctx, builder.clone())
-            .await {
-            println!("Error sending message to user: {:?}", e);
-        }
-    }
-
-    Ok(())
-}
 pub fn register() -> CreateCommand {
     CreateCommand::new("announce")
         .description("Announces to all whitelisted users.")
