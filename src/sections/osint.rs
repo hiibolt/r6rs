@@ -132,7 +132,7 @@ pub async fn lookup(
             &ctx, 
             &msg, 
             "No results", 
-            "Nothing were found for the given query!\n\nThere were no errors, but there weren't any results either.", 
+            "Nothing was found for the given query!\n\n*There were no errors, but there weren't any results either.*", 
             get_random_anime_girl()
             ).await
                 .unwrap();
