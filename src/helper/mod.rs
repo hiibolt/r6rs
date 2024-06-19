@@ -5,6 +5,7 @@ use crate::read_to_string;
 use std::fs::OpenOptions;
 use std::io::Write;
 use tokio::time::{ sleep, Duration };
+use serenity::model::colour::Colour;
 use serenity::all::EditMessage;
 use serenity::all::{ CreateEmbed, CreateMessage };
 use rand::prelude::SliceRandom;
@@ -58,6 +59,7 @@ pub async fn send_embed(
     let embed = CreateEmbed::new()
         .title(title)
         .description(description)
+        .color(get_random_color())
         .thumbnail(url);
     
     let builder = CreateMessage::new().embed(embed);
@@ -75,10 +77,19 @@ pub async fn edit_embed(
     let embed_builder = CreateEmbed::new()
         .title(title)
         .description(description)
+        .color(get_random_color())
         .thumbnail(url);
     let edit_builder = EditMessage::new().embed(embed_builder);
 
     msg.edit(ctx, edit_builder).await.unwrap();
+}
+pub fn get_random_color () -> Colour {
+    vec!(
+        Colour::FABLED_PINK,
+        Colour::MEIBE_PINK,
+        Colour::DARK_MAGENTA,
+        Colour::MAGENTA
+    ).choose(&mut rand::thread_rng()).unwrap().clone()
 }
 pub async fn _unimplemented(
     ctx: serenity::client::Context,
