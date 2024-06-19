@@ -331,7 +331,7 @@ async fn main() -> Result<()> {
         .activity(ActivityData {
             name: String::from("serverspace"),
             kind: ActivityType::Competing,
-            state: Some(String::from("Written and maintained by @hiibolt on GitHub.")),
+            state: Some(String::from("Written and maintained by @hiibolt")),
             url: Some(Url::parse("https://github.com/hiibolt/").expect("Hardcoded URL is invalid!"))
         })
         .status(OnlineStatus::DoNotDisturb)
