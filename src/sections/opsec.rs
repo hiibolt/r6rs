@@ -6,12 +6,9 @@ use crate::helper::edit_embed;
 use crate::Ubisoft;
 use crate::Value;
 use crate::{ Arc, Mutex };
-use crate::env;
 use anyhow::{ Result, anyhow };
-use tokio::process::Command;
+use tungstenite::connect;
 use std::collections::HashSet;
-use std::process::Stdio;
-use tokio::io::{BufReader, AsyncBufReadExt};
 
 
 async fn get_profiles(
@@ -36,16 +33,6 @@ async fn get_and_stringify_potential_profiles(
     no_special_characters: bool
 ) {
     let invalid_characters: [char; 5] = [' ', '.', '-', '_', '#'];
-    let invalid_sites: [&str; 38] = [
-        "Oracle", "8tracks", "Coders Rank", "Fiverr",
-        "HackerNews", "Modelhub", "metacritic", "xHamster",
-        "CNET", "YandexMusic", "HackerEarth", "OpenStreetMap", 
-        "Pinkbike", "Slides", "Strava", "Archive", "CGTrader",
-        "G2G", "NationStates", "IFTTT", "SoylentNews", "hunting",
-        "Contently", "Euw", "OurDJTalk", "BitCoinForum", "HEXRPG",
-        "Polymart", "Linktree", "GeeksforGeeks", "Kongregate", "RedTube",
-        "APClips", "Heavy-R", "RocketTube", "Zhihu", "NitroType", "babyRU"
-    ];
 
     let mut invalid_usernames = HashSet::new();
     let mut valid_usernames = HashSet::new();
@@ -74,47 +61,37 @@ async fn get_and_stringify_potential_profiles(
     // Query Sherlock
     for username in valid_usernames.iter() {
         println!("Querying Sherlock for {username}");
-        let proxy_link = env::var("PROXY_LINK")
-            .expect("Could not find PROXY_LINK in the environment!");
-        
-        println!("Starting with proxy link:\n\t{proxy_link}");
-        
-        let mut cmd = Command::new("python")
-            .arg("sherlock/sherlock")
-            .arg("--nsfw")
-            .arg("--folderoutput")
-            .arg("sherlock_output")
-            .arg("--timeout")
-            .arg("5")
-            .arg("--proxy")
-            .arg(proxy_link)
-            .arg("--local")
-            .arg(&format!("{username}"))
-            .stdout(Stdio::piped())
-            .spawn()
-            .expect("Issue running the Sherlock command! Did you install with Nix?");
-        {
-            let stdout = cmd.stdout.as_mut().unwrap();
-            let stdout_reader = BufReader::new(stdout);
-            let mut stdout_lines = stdout_reader.lines();
-    
-            *body += &format!("\n### {username}\n");
 
-            let mut found = false;
-            while let Ok(Some(output)) = stdout_lines.next_line().await {
-                if invalid_sites
+        *body += &format!("\n### {username}\n");
+
+        let (mut socket, response) = connect("ws://localhost:7780/ws")
+            .expect("Can't connect");
+
+        println!("Connected to Sherlock API!");
+        println!("Response HTTP code: {}", response.status());
+
+        socket.send(tungstenite::protocol::Message::Text(format!("{username}")))
+            .expect("Failed to send message to Sherlock API!");
+
+        // Read messages until the server closes the connection
+        let mut found = false;
+        loop {
+            let message = socket.read().expect("Failed to read message from Sherlock API!");
+
+            if let tungstenite::protocol::Message::Text(text) = message {
+                if invalid_usernames
                         .iter()
-                        .any(|site| output.contains(site))
+                        .any(|site| text.contains(site))
                 {
                     continue;
                 }
 
-                if output.contains("http") || output.contains("https") {
-                    println!("Found site for {username}: {output}");
+                if text.contains("http") || text.contains("https") {
+                    println!("Found site for {username}: {text}");
 
                     found = true;
 
-                    *body += &format!("\n{output}");            
+                    *body += &format!("{text}");            
                     edit_embed(
                         &ctx,
                         msg,
@@ -123,20 +100,21 @@ async fn get_and_stringify_potential_profiles(
                         url
                     ).await;
                 }
-            }
-
-            if !found {
-                *body += &format!("\nNo results found for {username}");
-                edit_embed(
-                    &ctx,
-                    msg,
-                    title,
-                    &body,
-                    url
-                ).await;
+            } else {
+                break;
             }
         }
-        cmd.wait().await.unwrap();
+
+        if !found {
+            *body += &format!("\nNo results found for {username}");
+            edit_embed(
+                &ctx,
+                msg,
+                title,
+                &body,
+                url
+            ).await;
+        }
     }
     
     if invalid_usernames.len() > 0 {

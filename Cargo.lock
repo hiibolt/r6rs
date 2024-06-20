@@ -1094,7 +1094,7 @@ dependencies = [
  "serde_json",
  "serenity",
  "tokio",
- "tungstenite",
+ "tungstenite 0.23.0",
  "ureq",
  "url",
 ]
@@ -1790,7 +1790,7 @@ dependencies = [
  "rustls-pki-types",
  "tokio",
  "tokio-rustls 0.25.0",
- "tungstenite",
+ "tungstenite 0.21.0",
  "webpki-roots 0.26.1",
 ]
 
@@ -1870,13 +1870,31 @@ dependencies = [
  "http 1.0.0",
  "httparse",
  "log",
- "native-tls",
  "rand",
  "rustls 0.22.4",
  "rustls-pki-types",
  "sha1",
  "thiserror",
  "url",
+ "utf-8",
+]
+
+[[package]]
+name = "tungstenite"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e2e2ce1e47ed2994fd43b04c8f618008d4cabdd5ee34027cf14f9d918edd9c8"
+dependencies = [
+ "byteorder",
+ "bytes",
+ "data-encoding",
+ "http 1.0.0",
+ "httparse",
+ "log",
+ "native-tls",
+ "rand",
+ "sha1",
+ "thiserror",
  "utf-8",
 ]
 
