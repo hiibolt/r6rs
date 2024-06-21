@@ -74,7 +74,7 @@ impl EventHandler for Bot {
                 message_id,
                 user_id,
                 server_id,
-                command: front_arg.clone()
+                command: args.clone().into_iter().collect::<String>()
             }) {
             println!("Failed to update DB with reason `{e}`!");
         }
