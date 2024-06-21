@@ -67,11 +67,6 @@ impl EventHandler for Bot {
             return;
         }
 
-        if let Err(e) = self.database
-            .lock().await
-            .verify_db() {
-            println!("Failed to update DB with reason {e}!");
-        }
 
         if let Err(e) = self.database
             .lock().await
@@ -79,10 +74,9 @@ impl EventHandler for Bot {
                 message_id,
                 user_id,
                 server_id,
-                command: front_arg.clone(),
-                result: String::from("Incomplete!")
+                command: front_arg.clone()
             }) {
-            println!("Failed to update DB with reason {e}!");
+            println!("Failed to update DB with reason `{e}`!");
         }
 
         match front_arg.chars().skip(2).collect::<String>().as_str() {
@@ -343,6 +337,12 @@ async fn main() -> Result<()> {
             )
         )
     );
+
+    if let Err(e) = database
+        .lock().await
+        .verify_db() {
+        println!("Failed to update DB with reason {e}!");
+    }
 
     // Start login process
     tokio::spawn(Ubisoft::auto_login( ubisoft_api.clone()));

@@ -10,8 +10,7 @@ pub struct CommandEntry {
     pub message_id: u64,
     pub user_id:    u64,
     pub server_id:  u64,
-    pub command:    String,
-    pub result:     String,
+    pub command:    String
 }
 impl Database {
     pub fn new(api_key: String) -> Self {
