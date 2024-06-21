@@ -338,10 +338,11 @@ async fn main() -> Result<()> {
         )
     );
 
+    // Test that the database is operational
     if let Err(e) = database
         .lock().await
         .verify_db() {
-        println!("Failed to update DB with reason {e}!");
+        println!("Failed to update DB with reason `{e}`!");
     }
 
     // Start login process

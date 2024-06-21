@@ -31,7 +31,7 @@ impl Database {
         let _ = ureq::get(&url)
             .set("xc-token", &self.api_key)
             .call()
-            .expect("Failed to send the request!");
+            .context("Failed to send the request!")?;
 
         Ok(())
     }
@@ -52,7 +52,7 @@ impl Database {
             .set("xc-token", &self.api_key)
             .set("Content-Type", "application/json")
             .send_string(&stringified_entry)
-            .expect("Failed to send the request!");
+            .context("Failed to send the request!")?;
 
         Ok(())
     }
