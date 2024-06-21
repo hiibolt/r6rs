@@ -6,7 +6,7 @@ mod apis;
 use crate::{
     sections::{ econ, opsec, admin, osint },
     helper::{ no_access, send_embed, get_random_anime_girl },
-    apis::{ Snusbase, BulkVS, Ubisoft }
+    apis::{ Snusbase, BulkVS, Ubisoft, Database }
 };
 
 use std::{
@@ -16,6 +16,7 @@ use std::{
     sync::Arc
 };
 
+use apis::database::CommandEntry;
 use tokio::sync::Mutex;
 use serde_json::Value;
 use serenity::{all::{ActivityData, ActivityType, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Interaction, OnlineStatus}, async_trait};
@@ -38,7 +39,8 @@ struct Bot {
     ubisoft_api: Arc<Mutex<Ubisoft>>,
     snusbase:    Arc<Mutex<Snusbase>>,
     bulkvs:      Arc<Mutex<BulkVS>>,
-    state:       Arc<Mutex<State>>
+    state:       Arc<Mutex<State>>,
+    database:    Arc<Mutex<Database>>
 }
 
 #[async_trait]
@@ -54,11 +56,33 @@ impl EventHandler for Bot {
             .map(|i| String::from(i))
             .collect();
         let user_id: u64 = msg.author.id.get();
+        let message_id: u64 = msg.id.get();
+        let server_id = msg.guild_id
+            .and_then(|gid| Some(gid.get()))
+            .unwrap_or(0u64);
 
         let front_arg = args.pop_front().unwrap();
 
         if &front_arg.chars().take(2).collect::<String>() != ">>" {
             return;
+        }
+
+        if let Err(e) = self.database
+            .lock().await
+            .verify_db() {
+            println!("Failed to update DB with reason {e}!");
+        }
+
+        if let Err(e) = self.database
+            .lock().await
+            .upload_command(CommandEntry { 
+                message_id,
+                user_id,
+                server_id,
+                command: front_arg.clone(),
+                result: String::from("Incomplete!")
+            }) {
+            println!("Failed to update DB with reason {e}!");
         }
 
         match front_arg.chars().skip(2).collect::<String>().as_str() {
@@ -310,6 +334,16 @@ async fn main() -> Result<()> {
         )
     );
 
+    // Build the Database object and log in
+    let database = Arc::new(
+        Mutex::new(
+            Database::new(
+                env::var("DATABASE_API_KEY")
+                    .expect("Could not find DATABASE_API_KEY in the environment!")
+            )
+        )
+    );
+
     // Start login process
     tokio::spawn(Ubisoft::auto_login( ubisoft_api.clone()));
 
@@ -326,7 +360,8 @@ async fn main() -> Result<()> {
             snusbase,
             bulkvs,
             ubisoft_api,
-            state
+            state,
+            database
         })
         .activity(ActivityData {
             name: String::from("serverspace"),
