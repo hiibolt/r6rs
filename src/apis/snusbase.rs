@@ -6,9 +6,15 @@ use std::{collections::HashMap, fmt::{self, Display, Formatter}};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SnusbaseDBResponse {
-    pub took: i32,
-    pub size: i32,
+    pub took: u32,
+    pub size: u32,
     pub results: HashMap<String, Vec<HashMap<String, Value>>>
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SnusbaseHashLookupResponse {
+    pub took: u32,
+    pub size: u32,
+    pub results: HashMap<String, Vec<Value>>
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SnusbaseIPResponse {
@@ -202,6 +208,33 @@ impl Snusbase {
         
         Ok(deserialized_resp)
     }
+    pub async fn hash_lookup_query ( 
+        &self,
+        terms: Vec<String>,
+        types: Vec<String>,
+        wildcard: bool
+    ) -> Result<SnusbaseHashLookupResponse> {
+        // Query Snusbase
+        let resp_object = ureq::post("https://api-experimental.snusbase.com/tools/hash-lookup")
+            .set("Auth", &self.api_key )
+            .set("Content-Type", "application/json")
+            .send_json(ureq::json!({
+                "terms": terms,
+                "types": types,
+                "wildcard": wildcard
+            }))
+            .map_err(|e| anyhow::anyhow!("Failed to query database query backend! {:?}", e))?;
+
+        // Debug print response
+        let resp_as_string = resp_object.into_string()
+            .context("Failed to convert response to string!")?;
+        
+        // Deserialize response with serde_json
+        let deserialized_resp: SnusbaseHashLookupResponse = serde_json::from_str(&resp_as_string)
+            .context("Failed to deserialize response!")?;
+        
+        Ok(deserialized_resp)
+    }
     pub async fn get_by_email (
         &self,
         email: String
@@ -249,6 +282,36 @@ impl Snusbase {
         self.database_query(
             vec!(name),
             vec!(String::from("name")),
+            false
+        ).await
+    }
+    pub async fn get_by_hash (
+        &self,
+        hash: String
+    ) -> Result<SnusbaseDBResponse> {
+        self.database_query(
+            vec!(hash),
+            vec!(String::from("hash")),
+            false
+        ).await
+    }
+    pub async fn rehash (
+        &self,
+        password: String
+    ) -> Result<SnusbaseHashLookupResponse> {
+        self.hash_lookup_query(
+            vec!(password),
+            vec!(String::from("password")),
+            false
+        ).await
+    }
+    pub async fn dehash (
+        &self,
+        hash: String
+    ) -> Result<SnusbaseHashLookupResponse> {
+        self.hash_lookup_query(
+            vec!(hash),
+            vec!(String::from("hash")),
             false
         ).await
     }

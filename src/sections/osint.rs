@@ -75,6 +75,18 @@ pub async fn lookup(
             
             ret
         },
+        "hash" => {
+            let mut ret = Err(anyhow::anyhow!("No hash provided!"));
+
+            if args.len() > 0 {
+                ret = snusbase.lock()
+                    .await
+                    .get_by_hash(args.into_iter().collect::<Vec<String>>().join(" "))
+                    .await;
+            }
+
+            ret
+        },
         _ => { panic!("Invalid lookup type!"); }
     };
 
@@ -176,7 +188,32 @@ pub async fn help (
         &ctx, 
         &msg, 
         "OSINT Help", 
-        "The `osint` command is used to query for information on emails, usernames, IPs, passwords and names.\n\n**Subcommands**:\n- `email` - Query by email\n- `username` - Query by username\n- `last_ip` Query by IP\n- `password` - Query by password\n- `name` - Query by name\n- `ip` - Geolocate by IP\n- `phone` - Perform CNAM lookup\n\n**Usage**:\n- `>>osint email <email>`\n- `>>osint username <username>`\n- `>>osint ip <ip>`\n- `>>osint password <password>`\n- `>>osint name <name>`\n- `>>osint last_ip <last ip>`\n- `>>osint phone <phone number>`", 
+        concat!("The `osint` command is used to query for information on emails, usernames, IPs, passwords and names.\n\n",
+        "## Subcommands:\n",
+        "### Personal Information\n",
+        "- `email` - Query database leaks by email\n", 
+        "- `username` - Query database leaks by username\n", 
+        "- `name` - Query database leaks by name\n",
+        "### Passwords\n",
+        "- `password` - Query database leaks by password\n",
+        "- `hash` - Query database leaks by hash\n",
+        "- `dehash` - Dehash a hash into pre-cracked passwords\n",
+        "- `rehash` - Rehash a password into pre-hashed hashes\n",
+        "### IP and Cellular\n",
+        "- `ip` - Geolocate by IP\n",
+        "- `last_ip` Query database leaks by IP\n",
+        "- `phone` - Perform CNAM lookup\n\n",
+        "**Usage**:\n",
+        "- `>>osint email <email>`\n",
+        "- `>>osint username <username>`\n",
+        "- `>>osint password <password>`\n",
+        "- `>>osint name <name>`\n",
+        "- `>>osint hash <hash>`\n",
+        "- `>>osint dehash <hash>`\n",
+        "- `>>osint rehash <password>`\n",
+        "- `>>osint ip <ip>`\n",
+        "- `>>osint last_ip <last ip>`\n",
+        "- `>>osint phone <phone number>`"), 
         get_random_anime_girl()
             ).await
                 .unwrap();
@@ -201,6 +238,15 @@ pub async fn osint (
         },
         "last_ip" => {
             tokio::spawn(lookup(snusbase, ctx, msg, args, "last_ip"));
+        },
+        "hash" => {
+            tokio::spawn(lookup(snusbase, ctx, msg, args, "hash"));
+        },
+        "password" => {
+            tokio::spawn(lookup(snusbase, ctx, msg, args, "password"));
+        },
+        "name" => {
+            tokio::spawn(lookup(snusbase, ctx, msg, args, "name"));
         },
         "phone" => {
             if let Some(phone_number) = args.pop_front() {
@@ -300,12 +346,172 @@ pub async fn osint (
             ).await
                 .unwrap();
         },
-        "password" => {
-            tokio::spawn(lookup(snusbase, ctx, msg, args, "password"));
+        "dehash" => {
+            let response = snusbase.lock()
+                .await
+                .dehash(args.into_iter().collect())
+                .await;
+
+            if let Err(e) = response {
+                let error_as_string = format!("{}", e);
+                if &error_as_string == "Failed to convert response to string!" {
+                    send_embed(
+                        &ctx, 
+                        &msg, 
+                        "An error occured", 
+                        &format!("Couldn't deserialize response! This probably means there were way, way too many results.\n\nDon't ask for things like `password123`!\n\nRaw Error: `{}`", error_as_string),
+                        get_random_anime_girl()
+                    ).await.expect("Failed to send message!");
+    
+                    return;
+
+                }
+
+                send_embed(
+                    &ctx, 
+                    &msg, 
+                    "An error occured", 
+                    &format!("{}", error_as_string),
+                    get_random_anime_girl()
+                ).await.expect("Failed to send message!");
+
+                return;
+            }
+
+            let mut body = String::new();
+            let response = response.unwrap();
+            let number_of_dumps = response.results.len();
+            let mut total_results = 0;
+
+            for (dump_ind, ( dump_name, content)) in response.results.iter().enumerate() {
+                body += &format!("## Dump {}/{}:\n*(From `{}`)*\n", dump_ind + 1, number_of_dumps, dump_name);
+
+                let number_of_results_in_dump = content.len();
+                for (result_ind, value) in content.iter().enumerate() {
+                    total_results += 1;
+
+                    for (key, value) in value.as_object().expect("Didn't get an object back from backend?") {
+                        body += &format!("\nResult {}/{}:\n- **{}**: {}\n", result_ind + 1, number_of_results_in_dump, key, value);
+                    }
+                }
+            }
+
+            if total_results > 20 {
+                send_embed(
+                    &ctx, 
+                    &msg, 
+                    "OSINT DUMP - `dehash`", 
+                    "There were more than 20 results, which in total contains more data than Discord can display.\n\nA full dump will be attached below shortly!", 
+                    get_random_anime_girl()
+                ).await
+                    .unwrap();
+        
+                let builder = CreateMessage::new();
+        
+                msg.channel_id.send_files(
+                    &ctx.http,
+                    std::iter::once(CreateAttachment::bytes(
+                        body.as_bytes(),
+                        "full_dump.txt"
+                    )),
+                    builder
+                ).await
+                    .unwrap();
+
+                return;
+            }
+
+            send_embed(
+                &ctx, 
+                &msg, 
+                "Dehash Results", 
+                &body,
+                get_random_anime_girl()
+            ).await.expect("Failed to send message!");
         },
-        "name" => {
-            tokio::spawn(lookup(snusbase, ctx, msg, args, "name"));
-        },
+        "rehash" => {
+            let response = snusbase.lock()
+                .await
+                .rehash(args.into_iter().collect())
+                .await;
+
+            if let Err(e) = response {
+                let error_as_string = format!("{}", e);
+                if &error_as_string == "Failed to convert response to string!" {
+                    send_embed(
+                        &ctx, 
+                        &msg, 
+                        "An error occured", 
+                        &format!("Couldn't deserialize response! This probably means there were way, way too many results.\n\nDon't ask for things like `password123`!\n\nRaw Error: `{}`", error_as_string),
+                        get_random_anime_girl()
+                    ).await.expect("Failed to send message!");
+    
+                    return;
+
+                }
+
+                send_embed(
+                    &ctx, 
+                    &msg, 
+                    "An error occured", 
+                    &format!("{}", error_as_string),
+                    get_random_anime_girl()
+                ).await.expect("Failed to send message!");
+
+                return;
+            }
+
+            let mut body = String::new();
+            let response = response.unwrap();
+            let number_of_dumps = response.results.len();
+            let mut total_results = 0;
+
+            for (dump_ind, ( dump_name, content)) in response.results.iter().enumerate() {
+                body += &format!("## Dump {}/{}:\n*(From `{}`)*\n", dump_ind + 1, number_of_dumps, dump_name);
+
+                let number_of_results_in_dump = content.len();
+                for (result_ind, value) in content.iter().enumerate() {
+                    total_results += 1;
+
+                    for (key, value) in value.as_object().expect("Didn't get an object back from backend?") {
+                        body += &format!("\nResult {}/{}:\n- **{}**: {}\n", result_ind + 1, number_of_results_in_dump, key, value);
+                    }
+                }
+            }
+
+            if total_results > 20 {
+                send_embed(
+                    &ctx, 
+                    &msg, 
+                    "OSINT DUMP - `rehash`", 
+                    "There were more than 20 results, which in total contains more data than Discord can display.\n\nA full dump will be attached below shortly!", 
+                    get_random_anime_girl()
+                ).await
+                    .unwrap();
+        
+                let builder = CreateMessage::new();
+        
+                msg.channel_id.send_files(
+                    &ctx.http,
+                    std::iter::once(CreateAttachment::bytes(
+                        body.as_bytes(),
+                        "full_dump.txt"
+                    )),
+                    builder
+                ).await
+                    .unwrap();
+
+                return;
+            }
+
+            send_embed(
+                &ctx, 
+                &msg, 
+                "Dehash Results", 
+                &body,
+                get_random_anime_girl()
+            ).await.expect("Failed to send message!");
+        }
         "help" => {
             tokio::spawn(help( ctx, msg ));
         },
