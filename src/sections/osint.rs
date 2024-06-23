@@ -419,6 +419,14 @@ pub async fn osint (
                     .unwrap();
 
                 return;
+            } else if total_results == 0 {
+                send_embed(
+                    &ctx, 
+                    &msg, 
+                    "No results", 
+                    "No results were found for the given query!",
+                    get_random_anime_girl()
+                ).await.expect("Failed to send message!");
             }
 
             send_embed(
@@ -502,6 +510,14 @@ pub async fn osint (
                     .unwrap();
 
                 return;
+            } else if total_results == 0 {
+                send_embed(
+                    &ctx, 
+                    &msg, 
+                    "No results", 
+                    "No results were found for the given query!",
+                    get_random_anime_girl()
+                ).await.expect("Failed to send message!");
             }
 
             send_embed(
