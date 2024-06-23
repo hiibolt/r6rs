@@ -427,6 +427,8 @@ pub async fn osint (
                     "No results were found for the given query!",
                     get_random_anime_girl()
                 ).await.expect("Failed to send message!");
+
+                return;
             }
 
             send_embed(
@@ -518,6 +520,8 @@ pub async fn osint (
                     "No results were found for the given query!",
                     get_random_anime_girl()
                 ).await.expect("Failed to send message!");
+
+                return;
             }
 
             send_embed(
