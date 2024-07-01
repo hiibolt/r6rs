@@ -1036,9 +1036,9 @@ checksum = "db23d408679286588f4d4644f965003d056e3dd5abcaaa938116871d7ce2fee7"
 
 [[package]]
 name = "plotpy"
-version = "0.6.1"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "662f8867d53720af4c262f067115e060fee394da9b021e93a792cd16f76db1cc"
+checksum = "a277e53342c34a26edcaf48e46f7b26be2b6648f295f9efc283596517bca2be6"
 
 [[package]]
 name = "powerfmt"

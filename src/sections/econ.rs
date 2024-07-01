@@ -249,11 +249,12 @@ async fn graph(
     
     // Define the output file path
     let item_path = format!("assets/{item_id}.png");
+    let valid_name = item_name.replace("'", "\'");
     
     // Plot our data curve
     Plot::new()
         .add(&data_curve)
-        .set_title(&format!("{item_name} ({item_type})"))
+        .set_title(&format!("{valid_name} ({item_type})"))
         .set_labels("Time (days ago)","Price (R6 Credits)")
         .save(&item_path)?;
     
