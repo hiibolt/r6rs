@@ -249,7 +249,7 @@ async fn graph(
     
     // Define the output file path
     let item_path = format!("assets/{item_id}.png");
-    let valid_name = item_name.replace("'", "\'");
+    let valid_name = item_name.replace("'", "\\'");
     
     // Plot our data curve
     Plot::new()
