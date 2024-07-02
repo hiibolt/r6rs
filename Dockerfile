@@ -7,6 +7,9 @@ RUN apt-get install -y pkg-config curl
 RUN apt-get install -y libssl-dev openssl
 RUN ["cargo", "build", "--release"]
 
+FROM python:3.12-slim 
+COPY --from=build /target/release/r6rs /r6rs
+COPY --from=build /assets /assets
 VOLUME /data
-CMD ["/target/release/r6rs"]
+CMD ["/r6rs"]
 EXPOSE 3000
