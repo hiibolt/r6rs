@@ -11,5 +11,8 @@ FROM python:3.12-slim
 COPY --from=build /target/release/r6rs /r6rs
 COPY --from=build /assets /assets
 VOLUME /data
+RUN pip install numpy
+RUN pip install matplotlib
+RUN pip install mpl_toolkits
 CMD ["/r6rs"]
 EXPOSE 3000
