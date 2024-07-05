@@ -100,7 +100,7 @@ impl EventHandler for Bot {
                         }
 
                         // Otherwise, go ahead
-                        tokio::spawn(econ(self.state.clone(), ctx, msg, args));
+                        tokio::spawn(econ(self.state.clone(), self.ubisoft_api.clone(), ctx, msg, args));
                     },
                     "opsec" => {
                         // Check if they're not on the whitelist
@@ -269,6 +269,7 @@ pub async fn help(
             "- `>>r6 econ graph <item name | item id>`\n",
             "- `>>r6 econ profit <purchased at> <item name | item id>`\n",
             "- `>>r6 econ list <(optional) page #>`\n",
+            "- `>>r6 econ transfer <(optional) number of items>`\n",
             "- `>>r6 econ help`\n",
             "**R6 OPSEC Command List**:\n",
             "- `>>opsec <pc | xbox | psn> <username>`\n",

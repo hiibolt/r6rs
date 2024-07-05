@@ -1,9 +1,10 @@
 use base64::prelude::*;
 use reqwest::header::HeaderMap;
+use serde::{Deserialize, Serialize};
 use crate::Value;
 use std::error::Error;
 use reqwest::StatusCode;
-use tokio::time::{ sleep, Duration };
+use tokio::{fs::read_to_string, time::{ sleep, Duration }};
 use crate::{ Arc, Mutex };
 use anyhow::{ Result, bail, anyhow, Context };
 
@@ -64,6 +65,8 @@ impl Ubisoft {
     }
     pub async fn auto_login( state: Arc<Mutex<Ubisoft>> ) {
         loop {
+            println!("[ Reauthenticating with Ubisoft! ]");
+
             state
                 .lock().await
                 .login().await.expect("Failed to log in!");
@@ -77,6 +80,37 @@ impl Ubisoft {
 
         let request = client.get(&url)
             .headers(self.headers.clone());
+        
+        match 
+            request
+                .send()
+                .await?
+                .error_for_status() 
+        {
+            Ok(response) => {
+                let json = serde_json::from_str(
+                        &response.text().await
+                            .context("Failed to extract text for basic request!")?
+                    )
+                    .context("Failed to unwrap JSON for basic request!")?;
+
+                Ok(json)
+            },
+            Err(err) => {
+                bail!("Request to {url} may have failed for reason {:#?}", err);
+            }
+        }
+    }
+    pub async fn graphql_request ( &mut self, url: String, body: String ) -> Result<Value> {
+        let client = reqwest::Client::new();
+
+        let mut headers_with_new_locale = self.headers.clone();
+        headers_with_new_locale.insert("Ubi-LocaleCode", "en-US".parse()?);
+
+        let request = client.post(&url)
+            .headers(headers_with_new_locale)
+            .body(body);
+
         
         match 
             request
@@ -126,4 +160,102 @@ impl Ubisoft {
         }
         Ok(account_id)
     }
+
+    pub async fn get_least_sold ( 
+        &mut self,
+        number_of_items: usize
+    ) -> Result<Vec<DisplayableItem>> {
+        println!("Attempting GraphQL request...");
+    
+        // Load the `query.txt` file
+        let query = read_to_string("assets/query.txt")
+            .await
+            .context("Could not find 'assets/query.txt', please ensure you have created one!")?;
+    
+        let mut offset: usize = 0;
+        let mut items: Vec<DisplayableItem> = Vec::new();
+    
+        while items.len() < number_of_items {
+            println!("Passing with offset: {}", offset);
+    
+            let lowest_sales_raw: Value = self
+                .graphql_request(
+                    format!("https://public-ubiservices.ubi.com/v1/profiles/me/uplay/graphql"),
+                    query.replace("PLACEHOLDER_OFFSET_REPLACEME", &offset.to_string())
+                )
+                .await.expect("Failed to get lowest sales!");
+    
+            let lowest_sales: Vec<UbisoftGraphQLResponse> = serde_json::from_value(lowest_sales_raw)
+                .context("Failed to parse lowest sales!")?;
+    
+            for node in lowest_sales[0].data.game.marketable_items.nodes.iter() {
+                if let Some(item) = unpack_node(node.clone()) {
+                    if item.sellers == 0 || item.last_sold_at > 180 {
+                        continue;
+                    }
+    
+                    items.push(item);
+    
+                    if items.len() >= number_of_items {
+                        break;
+                    }
+                }
+            }
+    
+            offset += 40;
+        }
+    
+        Ok(items)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct UbisoftGraphQLMarketableItems {
+    nodes: Vec<Value>,
+    #[serde(rename = "totalCount")]
+    total_count: i32
+}
+#[derive(Debug, Serialize, Deserialize)]
+struct UbisoftGraphQLGame {
+    id: String,
+    #[serde(rename = "marketableItems")]
+    marketable_items: UbisoftGraphQLMarketableItems
+}
+#[derive(Debug, Serialize, Deserialize)]
+struct UbisoftGraphQLData {
+    game: UbisoftGraphQLGame
+}
+#[derive(Debug, Serialize, Deserialize)]
+struct UbisoftGraphQLResponse {
+    data: UbisoftGraphQLData
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DisplayableItem {
+    pub item_id: String,
+    pub asset_url: String,
+    pub item_type: String,
+    pub name: String,
+
+    pub sellers: usize,
+    pub last_sold_at: usize
+}
+fn unpack_node ( node: Value ) -> Option<DisplayableItem> {
+    let item_id = node.get("item")?.get("itemId")?.as_str()?.to_string();
+    let asset_url = node.get("item")?.get("assetUrl")?.as_str()?.to_string();
+    let item_type = format!("{} - {}",
+        node.get("item")?.get("type")?.as_str()?.to_string(),
+        node.get("item")?.get("tags")?.as_array()?.iter().next()?.as_str()?.to_string());
+    let name = node.get("item")?.get("name")?.as_str()?.to_string();
+
+    let sellers = node.get("marketData")?.get("sellStats")?.as_array()?.iter().next()?.get("activeCount")?.as_i64()? as usize;
+    let last_sold_at = node.get("marketData")?.get("lastSoldAt")?.as_array()?.iter().next()?.get("price")?.as_i64()? as usize;
+
+    Some(DisplayableItem {
+        item_id,
+        asset_url,
+        item_type,
+        name,
+        sellers,
+        last_sold_at
+    })
 }

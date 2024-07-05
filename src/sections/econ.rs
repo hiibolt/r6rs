@@ -1,3 +1,4 @@
+use crate::apis::Ubisoft;
 use crate::helper::get_random_anime_girl;
 use crate::Message;
 use serenity::all::{
@@ -339,12 +340,71 @@ async fn help(
         &ctx, 
         &msg, 
         "R6 - Economy - Help", 
-        "**Command List**:\n- `>>r6 econ analyze <item name | item id>`\n- `>>r6 econ graph <item name | item id>`\n- `>>r6 econ profit <purchased at> <item name | item id>`\n- `>>r6 econ list <(optional) page #>`\n- `>>r6 econ help`", 
+        "**Command List**:\n- `>>r6 econ analyze <item name | item id>`\n- `>>r6 econ graph <item name | item id>`\n- `>>r6 econ profit <purchased at> <item name | item id>`\n- `>>r6 econ list <(optional) page #>`\n- `>>r6 econ transfer <(optional) number of items>`\n- `>>r6 econ help`", 
         get_random_anime_girl()
     ).await
         .expect("Failed to send embed!");
 }
-pub async fn econ( state: Arc<Mutex<State>>, ctx: serenity::client::Context, msg: Message, mut args: VecDeque<String> ) {
+pub async fn transfer (
+    ubisoft_api: Arc<Mutex<Ubisoft>>,
+    ctx: serenity::client::Context,
+    msg: Message,
+    mut args: VecDeque<String> 
+) {
+    let number_of_items = args.pop_front()
+        .unwrap_or(String::from("15"))
+        .parse::<usize>()
+        .unwrap_or(15)
+        .min(15);
+    let items = ubisoft_api.lock().await
+        .get_least_sold(number_of_items).await;
+
+    if let Err(err) = items {
+        let _ = send_embed(
+            &ctx, 
+            &msg, 
+            &format!("R6 - Economy - {} Least Sold Items", number_of_items), 
+            &format!("Failed to get items with an error! Please see below:\n\n{:#?}", err), 
+            get_random_anime_girl()
+        ).await
+            .expect("Failed to send embed!");
+
+        return;
+    }
+
+    let items = items.expect("Unreachable!");
+
+    let mut body = String::new();
+
+    for item in &items {
+        body.push_str(
+            &format!(
+                "\n**{}** - [Link](https://www.ubisoft.com/en-gb/game/rainbow-six/siege/marketplace?route=buy%2Fitem-details&itemId={})\n{}\n**{}** Current Sellers, Last Sold at **{}** R6 Credits\n",
+                item.name,
+                item.item_id,
+                item.item_type,
+                item.sellers,
+                item.last_sold_at
+            )
+        );
+    }
+
+    let _ = send_embed(
+        &ctx, 
+        &msg, 
+        "R6 - Economy - 20 Least Sold Items", 
+        &body, 
+        &items.get(0).expect("Unreachable?").asset_url
+    ).await
+        .expect("Failed to send embed!");
+}
+pub async fn econ(
+    state: Arc<Mutex<State>>,
+    ubisoft_api: Arc<Mutex<Ubisoft>>,
+    ctx: serenity::client::Context,
+    msg: Message,
+    mut args: VecDeque<String>
+) {
     match args
         .pop_front()
         .unwrap_or(String::from("help"))
@@ -439,6 +499,9 @@ pub async fn econ( state: Arc<Mutex<State>>, ctx: serenity::client::Context, msg
                 }
             };
         },
+        "transfer" => {
+            tokio::spawn(transfer( ubisoft_api.clone(), ctx, msg, args ));
+        }
         "help" => {
             tokio::spawn(help( ctx, msg ));
         },

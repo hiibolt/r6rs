@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use serenity::all::{CommandOptionType, Context, CreateCommandOption, ResolvedValue};
+use serenity::all::{ CommandOptionType, Context, CreateCommandOption };
 use tokio::sync::Mutex;
 
 use serenity::builder::CreateCommand;
@@ -7,28 +7,13 @@ use serenity::model::application::ResolvedOption;
 
 use crate::apis::Ubisoft;
 
+
 pub async fn run<'a>(
-    options: Vec<ResolvedOption<'a>>,
+    _options: Vec<ResolvedOption<'a>>,
     _ctx:      &Context,
-    state:    Arc<Mutex<Ubisoft>>
+    _state:    Arc<Mutex<Ubisoft>>
 ) -> Result<String, serenity::Error>  {
-    let username = match options.get(0).expect("Missing username!").value {
-        ResolvedValue::String(ref username) => username,
-        _ => panic!("Username must be a string!")
-    };
-
-    let my_profile_id = state.lock().await
-        .get_account_id(username.to_string(), String::from("uplay")).await
-        .expect("Failed to get profile id!");
-
-    println!("My profile id: {my_profile_id}");
-
-    let res = state.lock().await.get_applications(my_profile_id).await
-        .expect("Failed to get applications!");
-
-    println!("Result: {res}");
-
-    Ok(format!("{:?}",res))
+    Ok(String::from("This command is not yet implemented."))
 }
 pub fn register() -> CreateCommand {
     CreateCommand::new("development")
