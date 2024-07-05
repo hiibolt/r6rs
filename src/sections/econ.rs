@@ -355,7 +355,7 @@ pub async fn transfer (
         .unwrap_or(String::from("15"))
         .parse::<usize>()
         .unwrap_or(15)
-        .min(15);
+        .min(30);
     let items = ubisoft_api.lock().await
         .get_least_sold(number_of_items).await;
 
