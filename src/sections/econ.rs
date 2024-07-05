@@ -355,7 +355,7 @@ pub async fn transfer (
         .unwrap_or(String::from("15"))
         .parse::<usize>()
         .unwrap_or(15)
-        .min(30);
+        .min(15);
     let items = ubisoft_api.lock().await
         .get_least_sold(number_of_items).await;
 
@@ -379,7 +379,7 @@ pub async fn transfer (
     for item in &items {
         body.push_str(
             &format!(
-                "\n**{}** - [Link](https://www.ubisoft.com/en-gb/game/rainbow-six/siege/marketplace?route=buy%2Fitem-details&itemId={})\n{}\n**{}** Current Sellers, Last Sold at **{}** R6 Credits\n",
+                "\n**{}** - [Sell](https://www.ubisoft.com/en-gb/game/rainbow-six/siege/marketplace?route=sell%2Fitem-details&itemId={})\n{}\n**{}** Current Sellers, Last Sold at **{}** R6 Credits\n",
                 item.name,
                 item.item_id,
                 item.item_type,
@@ -392,7 +392,7 @@ pub async fn transfer (
     let _ = send_embed(
         &ctx, 
         &msg, 
-        "R6 - Economy - 20 Least Sold Items", 
+        &format!("R6 - Economy - {} Least Sold Items", number_of_items), 
         &body, 
         &items.get(0).expect("Unreachable?").asset_url
     ).await
