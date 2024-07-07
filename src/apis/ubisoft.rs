@@ -2,7 +2,6 @@ use base64::prelude::*;
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 use crate::Value;
-use std::error::Error;
 use reqwest::StatusCode;
 use tokio::{fs::read_to_string, time::{ sleep, Duration }};
 use crate::{ Arc, Mutex };
@@ -29,7 +28,7 @@ impl Ubisoft {
             headers: HeaderMap::new()
         }
     }
-    pub async fn login ( &mut self ) -> Result<(), Box<dyn Error>> {
+    pub async fn login ( &mut self ) -> Result<()> {
         let client = reqwest::Client::new();
 
         self.headers.insert("Authorization", format!("Basic {}", self.token).parse()?);
@@ -51,13 +50,15 @@ impl Ubisoft {
             StatusCode::OK => {
                 let response_json: Value = serde_json::from_str(&response.text().await?)?;
 
-                self.headers.insert("Authorization", format!("Ubi_v1 t={}", response_json["ticket"].as_str().ok_or("Ticket missing from Ubi response!")?).parse()?);
-                self.headers.insert("Ubi-SessionId", response_json["sessionId"].as_str().ok_or("Ticket missing from Ubi response!")?.parse()?);
+                self.headers.insert("Authorization", format!("Ubi_v1 t={}", response_json["ticket"].as_str().ok_or(anyhow!("Ticket missing from Ubi response!"))?).parse()?);
+                self.headers.insert("Ubi-SessionId", response_json["sessionId"].as_str().ok_or(anyhow!("Ticket missing from Ubi response!"))?.parse()?);
     
                 println!("Successfully authenticated!");
             },
             _ => {
-                panic!("Failed to authenticate with given login! Verify your information is correct.");
+                println!("Failed to authenticate! Response: \"{response:#?}\"");
+
+                bail!("Failed to authenticate with given login! Verify your information is correct.");
             }
         }
 
@@ -168,7 +169,8 @@ impl Ubisoft {
         println!("Attempting GraphQL request...");
     
         // Load the `query.txt` file
-        let query = read_to_string("assets/query.txt")
+        let path = "assets/query.txt";
+        let query = read_to_string(path)
             .await
             .context("Could not find 'assets/query.txt', please ensure you have created one!")?;
     
@@ -190,7 +192,54 @@ impl Ubisoft {
     
             for node in lowest_sales[0].data.game.marketable_items.nodes.iter() {
                 if let Some(item) = unpack_node(node.clone()) {
-                    if item.sellers == 0 || item.last_sold_at > 180 {
+                    if item.last_sold_at > 180 {
+                        continue;
+                    }
+    
+                    items.push(item);
+    
+                    if items.len() >= number_of_items {
+                        break;
+                    }
+                }
+            }
+    
+            offset += 40;
+        }
+    
+        Ok(items)
+    }
+    pub async fn get_least_sold_owned ( 
+        &mut self,
+        number_of_items: usize
+    ) -> Result<Vec<DisplayableItem>> {
+        println!("Attempting GraphQL request...");
+    
+        // Load the `query.txt` file
+        let path = "assets/query_owned.txt";
+        let query = read_to_string(path)
+            .await
+            .context("Could not find 'assets/query.txt', please ensure you have created one!")?;
+    
+        let mut offset: usize = 0;
+        let mut items: Vec<DisplayableItem> = Vec::new();
+    
+        while items.len() < number_of_items {
+            println!("Passing with offset: {}", offset);
+    
+            let lowest_sales_raw: Value = self
+                .graphql_request(
+                    format!("https://public-ubiservices.ubi.com/v1/profiles/me/uplay/graphql"),
+                    query.replace("PLACEHOLDER_OFFSET_REPLACEME", &offset.to_string())
+                )
+                .await.expect("Failed to get lowest sales!");
+    
+            let lowest_sales: Vec<UbisoftGraphQLResponseWithViewer> = serde_json::from_value(lowest_sales_raw.clone())
+                .map_err(|e| anyhow!("Failed to parse lowest sales!\\n\\n{e:#?}\\n\\nRaw Response: {:?}", lowest_sales_raw.to_string().chars().take(300).collect::<String>()))?;
+    
+            for node in lowest_sales[0].data.game.viewer.meta.marketable_items.nodes.iter() {
+                if let Some(item) = unpack_node(node.clone()) {
+                    if item.last_sold_at > 180 {
                         continue;
                     }
     
@@ -229,6 +278,31 @@ struct UbisoftGraphQLData {
 struct UbisoftGraphQLResponse {
     data: UbisoftGraphQLData
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+struct UbisoftGraphQLDataWithViewer {
+    game: UbisoftGraphQLGameWithViewer
+}
+#[derive(Debug, Serialize, Deserialize)]
+struct UbisoftGraphQLGameWithViewer {
+    id: String,
+    viewer: UbisoftGraphQLViewer
+}
+#[derive(Debug, Serialize, Deserialize)]
+struct UbisoftGraphQLViewer {
+    meta: UbisoftGraphQLMeta
+}
+#[derive(Debug, Serialize, Deserialize)]
+struct UbisoftGraphQLMeta {
+    id: String,
+    #[serde(rename = "marketableItems")]
+    marketable_items: UbisoftGraphQLMarketableItems
+}
+#[derive(Debug, Serialize, Deserialize)]
+struct UbisoftGraphQLResponseWithViewer {
+    data: UbisoftGraphQLDataWithViewer
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DisplayableItem {
     pub item_id: String,

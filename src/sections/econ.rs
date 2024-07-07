@@ -340,7 +340,7 @@ async fn help(
         &ctx, 
         &msg, 
         "R6 - Economy - Help", 
-        "**Command List**:\n- `>>r6 econ analyze <item name | item id>`\n- `>>r6 econ graph <item name | item id>`\n- `>>r6 econ profit <purchased at> <item name | item id>`\n- `>>r6 econ list <(optional) page #>`\n- `>>r6 econ transfer <(optional) number of items>`\n- `>>r6 econ help`", 
+        "**Command List**:\n- `>>r6 econ analyze <item name | item id>`\n- `>>r6 econ graph <item name | item id>`\n- `>>r6 econ profit <purchased at> <item name | item id>`\n- `>>r6 econ list <(optional) page #>`\n- `>>r6 econ transfer <(optional) email> <(optional) password>`\n- `>>r6 econ help`", 
         get_random_anime_girl()
     ).await
         .expect("Failed to send embed!");
@@ -351,13 +351,60 @@ pub async fn transfer (
     msg: Message,
     mut args: VecDeque<String> 
 ) {
-    let number_of_items = args.pop_front()
+    /* let number_of_items = args.pop_front()
         .unwrap_or(String::from("15"))
         .parse::<usize>()
         .unwrap_or(15)
-        .min(15);
-    let items = ubisoft_api.lock().await
-        .get_least_sold(number_of_items).await;
+        .min(15); */
+    let number_of_items = 15;
+
+    let mut block_ubisoft_api = ubisoft_api.clone();
+    let mut used_login = false;
+    if let Some(email) = args.pop_front() {
+        if let Some(password) = args.pop_front() {
+            println!("Logging in with email: {} and password: {}", email, password);
+
+            let temporary_ubisoft_api = Arc::new(Mutex::new(Ubisoft::new(email, password)));
+
+            if let Err(err) = temporary_ubisoft_api.lock().await.login().await {
+                let _ = send_embed(
+                    &ctx, 
+                    &msg, 
+                    &format!("R6 - Economy - {} Least Sold Items", number_of_items), 
+                    &format!("Failed to get items with an error! Please see below:\n\n{:#?}", err), 
+                    get_random_anime_girl()
+                ).await
+                    .expect("Failed to send embed!");
+        
+                return;
+            }
+
+            block_ubisoft_api = temporary_ubisoft_api;
+
+            used_login = true;
+        } else {
+            let _ = send_embed(
+                &ctx, 
+                &msg, 
+                &format!("R6 - Economy - {} Least Sold Items", number_of_items), 
+                "You provided an email, but no password! Please provide both to use the login feature.", 
+                &get_random_anime_girl()
+            ).await
+                .expect("Failed to send embed!");
+
+            return;
+        }
+    }
+
+    let items = if used_login {
+        block_ubisoft_api
+            .lock().await
+            .get_least_sold_owned(number_of_items).await
+    } else {
+        block_ubisoft_api
+            .lock().await
+            .get_least_sold(number_of_items).await
+    };
 
     if let Err(err) = items {
         let _ = send_embed(
@@ -387,6 +434,12 @@ pub async fn transfer (
                 item.last_sold_at
             )
         );
+    }
+
+    if used_login {
+        body.push_str("\n\nData was gathered using your provided Ubisoft account.");
+    } else {
+        body.push_str("\n\nData is global, and gathered using an arbitrary Ubisoft account.");
     }
 
     let _ = send_embed(

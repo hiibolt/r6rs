@@ -269,7 +269,7 @@ pub async fn help(
             "- `>>r6 econ graph <item name | item id>`\n",
             "- `>>r6 econ profit <purchased at> <item name | item id>`\n",
             "- `>>r6 econ list <(optional) page #>`\n",
-            "- `>>r6 econ transfer <(optional) number of items>`\n",
+            "- `>>r6 econ transfer <(optional) email> <(optional) password>`\n",
             "- `>>r6 econ help`\n",
             "**R6 OPSEC Command List**:\n",
             "- `>>opsec <pc | xbox | psn> <username>`\n",
