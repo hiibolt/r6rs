@@ -219,7 +219,7 @@ impl Ubisoft {
         let path = "assets/query_owned.txt";
         let query = read_to_string(path)
             .await
-            .context("Could not find 'assets/query.txt', please ensure you have created one!")?;
+            .context("Could not find 'assets/query_owned.txt', please ensure you have created one!")?;
     
         let mut offset: usize = 0;
         let mut items: Vec<DisplayableItem> = Vec::new();
