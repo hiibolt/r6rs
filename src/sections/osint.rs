@@ -1,8 +1,10 @@
+use crate::apis::is_valid_sherlock_username;
 use crate::apis::{ snusbase::Snusbase, bulkvs::BulkVS };
-use crate::helper::{ get_random_anime_girl, send_embed };
+use crate::helper::{ edit_embed, get_random_anime_girl, send_embed };
 
 use serenity::all::{CreateAttachment, CreateMessage, Message};
 use tokio::sync::Mutex;
+use tungstenite::connect;
 use std::{collections::VecDeque, sync::Arc};
 
 
@@ -202,7 +204,9 @@ pub async fn help (
         "### IP and Cellular\n",
         "- `ip` - Geolocate by IP\n",
         "- `last_ip` Query database leaks by IP\n",
-        "- `phone` - Perform CNAM lookup\n\n",
+        "- `phone` - Perform CNAM lookup\n",
+        "### Crossreferencing\n",
+        "- `sherlock` - Query for sites with that username\n\n",
         "**Usage**:\n",
         "- `>>osint email <email>`\n",
         "- `>>osint username <username>`\n",
@@ -213,7 +217,8 @@ pub async fn help (
         "- `>>osint rehash <password>`\n",
         "- `>>osint ip <ip>`\n",
         "- `>>osint last_ip <last ip>`\n",
-        "- `>>osint phone <phone number>`"), 
+        "- `>>osint phone <phone number>`\n",
+        "- `>>osint sherlock <username>`"), 
         get_random_anime_girl()
             ).await
                 .unwrap();
@@ -532,6 +537,91 @@ pub async fn osint (
                 get_random_anime_girl()
             ).await.expect("Failed to send message!");
         }
+        "sherlock" => {
+            let username = if let Some(username) = args.pop_front() {
+                username
+            } else {
+                send_embed(
+                    &ctx, 
+                    &msg, 
+                    "Error", 
+                    "Please provide a username!", 
+                    get_random_anime_girl()
+                ).await
+                    .unwrap();
+
+                return;
+            };
+
+            let mut body = String::new();
+            // Warn the user if the username is poor quality
+            if !is_valid_sherlock_username(&username, false) {              
+                body += &format!("### Warning\nThe username `{username}` has special characters and may not return quality results!");
+            }
+
+            let title = format!("OSINT - Sherlock - {username}");
+            let url = get_random_anime_girl();
+            let mut base_msg = send_embed(
+                    &ctx, 
+                    &msg, 
+                    &title, 
+                    "Preparing to search...", 
+                    &url
+                ).await
+                    .unwrap();
+            
+            // Query Sherlock
+            println!("Querying Sherlock for {username}");
+
+            body += &format!("\n### {username}\n");
+
+            let sherlock_ws_url = std::env::var("SHERLOCK_WS_URL")
+                .expect("SHERLOCK_WS_URL not set!");
+            let (mut socket, response) = connect(&sherlock_ws_url)
+                .expect("Can't connect");
+
+            println!("Connected to Sherlock API!");
+            println!("Response HTTP code: {}", response.status());
+
+            socket.send(tungstenite::protocol::Message::Text(format!("{username}")))
+                .expect("Failed to send message to Sherlock API!");
+
+            // Read messages until the server closes the connection
+            let mut found = false;
+            loop {
+                let message = socket.read().expect("Failed to read message from Sherlock API!");
+
+                if let tungstenite::protocol::Message::Text(text) = message {
+                    if text.contains("http") || text.contains("https") {
+                        println!("Found site for {username}: {text}");
+
+                        found = true;
+
+                        body += &format!("{text}");            
+                        edit_embed(
+                            &ctx,
+                            &mut base_msg,
+                            &title,
+                            &body,
+                            url
+                        ).await;
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            if !found {
+                body += &format!("\nNo results found for {username}");
+                edit_embed(
+                    &ctx,
+                    &mut base_msg,
+                    &title,
+                    &body,
+                    &url
+                ).await;
+            }
+        },
         "help" => {
             tokio::spawn(help( ctx, msg ));
         },

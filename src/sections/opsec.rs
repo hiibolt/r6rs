@@ -1,13 +1,12 @@
+use crate::apis::get_and_stringify_potential_profiles;
 use crate::helper::get_random_anime_girl;
 use crate::VecDeque;
 use crate::Message;
 use crate::send_embed;
-use crate::helper::edit_embed;
 use crate::Ubisoft;
 use crate::Value;
 use crate::{ Arc, Mutex };
 use anyhow::{ Result, anyhow };
-use tungstenite::connect;
 use std::collections::HashSet;
 
 
@@ -22,119 +21,6 @@ async fn get_profiles(
     
     Some(profiles.get("profiles")?
         .as_array()?.clone())
-}
-async fn get_and_stringify_potential_profiles( 
-    usernames: &HashSet<String>, 
-    ctx: &serenity::client::Context, 
-    msg: &mut Message, 
-    title: &str, 
-    body: &mut String, 
-    url: &str,
-    no_special_characters: bool
-) {
-    let invalid_characters: [char; 5] = [' ', '.', '-', '_', '#'];
-
-    let mut invalid_usernames = HashSet::new();
-    let mut valid_usernames = HashSet::new();
-
-    for username in usernames.iter() {
-        let allow_all: bool = !no_special_characters;
-        let has_invalid_char: bool = !invalid_characters
-            .iter()
-            .any(|&ch| username.contains(ch));
-        let has_alpha_first: bool = username
-            .chars()
-            .next().unwrap_or(' ')
-            .is_alphabetic();
-        let within_length: bool = username.chars().count() < 20;
-
-        // If the username is bad, let the user know.
-        if !(allow_all || ( has_invalid_char && has_alpha_first && within_length )) {
-            invalid_usernames.insert(username.clone());
-
-            continue;
-        }
-
-        valid_usernames.insert(username.clone());
-    }
-
-    // Query Sherlock
-    for username in valid_usernames.iter() {
-        println!("Querying Sherlock for {username}");
-
-        *body += &format!("\n### {username}\n");
-
-        let (mut socket, response) = connect("ws://localhost:7780/ws")
-            .expect("Can't connect");
-
-        println!("Connected to Sherlock API!");
-        println!("Response HTTP code: {}", response.status());
-
-        socket.send(tungstenite::protocol::Message::Text(format!("{username}")))
-            .expect("Failed to send message to Sherlock API!");
-
-        // Read messages until the server closes the connection
-        let mut found = false;
-        loop {
-            let message = socket.read().expect("Failed to read message from Sherlock API!");
-
-            if let tungstenite::protocol::Message::Text(text) = message {
-                if invalid_usernames
-                        .iter()
-                        .any(|site| text.contains(site))
-                {
-                    continue;
-                }
-
-                if text.contains("http") || text.contains("https") {
-                    println!("Found site for {username}: {text}");
-
-                    found = true;
-
-                    *body += &format!("{text}");            
-                    edit_embed(
-                        &ctx,
-                        msg,
-                        title,
-                        &body,
-                        url
-                    ).await;
-                }
-            } else {
-                break;
-            }
-        }
-
-        if !found {
-            *body += &format!("\nNo results found for {username}");
-            edit_embed(
-                &ctx,
-                msg,
-                title,
-                &body,
-                url
-            ).await;
-        }
-    }
-    
-    if invalid_usernames.len() > 0 {
-        *body += "\n### Ignored Usernames\n";
-        
-        *body += &invalid_usernames.into_iter()
-            .map(|username| format!("- {username}"))
-            .collect::<Vec<String>>()
-            .join("\n");
-
-        *body += "\n\nThese usernames would produce poor results from Sherlock. You can always run them manually with the following command :)\n`>>r6 opsec namefind <username>`";
-
-        edit_embed(
-            &ctx,
-            msg,
-            title,
-            &body,
-            url
-        ).await;
-    }
 } 
 fn stringify_profiles(
     profiles: &Vec<Value>,
@@ -450,54 +336,6 @@ fn serialize_applications_response (
 
     Ok(body)
 }
-async fn namefind( 
-    ctx: serenity::client::Context,
-    msg: Message,
-    args: VecDeque<String>
-) { 
-    let mut body = String::new();
-    let title = "OPSEC - Namefind";
-
-    // Ensure argument
-    let usernames: HashSet<String> = args
-        .into_iter()
-        .collect();
-    if usernames.len() == 0 {
-        body += "Please supply a username!";
-
-        send_embed(
-            &ctx, 
-            &msg, 
-            title, 
-            &body, 
-            "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
-        ).await
-            .unwrap();
-
-        return;
-    }
-    
-    body += &format!("Searching for {:?}", usernames);
-    
-    let mut sent_msg = send_embed(
-        &ctx, 
-        &msg, 
-        title, 
-        &body, 
-        "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
-    ).await
-        .expect("Failed to send embed!");
-
-    get_and_stringify_potential_profiles(
-        &usernames, 
-        &ctx, 
-        &mut sent_msg, 
-        title, 
-        &mut body, 
-        "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4",
-        false
-    ).await;   
-}
 async fn help(
     ctx: serenity::client::Context,
     msg: Message
@@ -506,7 +344,7 @@ async fn help(
         &ctx, 
         &msg, 
         "R6 - OPSEC - Help", 
-        "**Command List**:\n- `>>r6 opsec <pc | xbox | psn> <account name>`\n- `>>r6 opsec namefind <username1> <username2> ...`\n- `>>r6 opsec applications <pc uplay>`\n- `>>r6 opsec help`", 
+        "**Command List**:\n- `>>r6 opsec <pc | xbox | psn> <account name>`\n- `>>r6 opsec applications <pc uplay>`\n- `>>r6 opsec help`", 
         "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
     ).await
         .expect("Failed to send embed!");
@@ -535,7 +373,14 @@ pub async fn opsec(
             tokio::spawn(applications( ubisoft_api, ctx, msg, args ));
         }, 
         "namefind" => {
-            tokio::spawn(namefind( ctx, msg, args ));
+            send_embed(
+                &ctx, 
+                &msg, 
+                "Command depreciated", 
+                "Please instead use the following:\n`>>osint sherlock <username>`", 
+                "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
+            ).await
+                .unwrap();
         },
         "help" => {
             tokio::spawn(help( ctx, msg ));
