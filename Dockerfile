@@ -11,8 +11,7 @@ FROM python:3.12-slim
 
 # Import needed data
 COPY --from=build /target/release/r6rs /r6rs
-COPY --from=build /assets /assets
-VOLUME /data
+VOLUME /assets
 
 # Add Tini
 ENV TINI_VERSION v0.19.0
