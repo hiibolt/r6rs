@@ -189,7 +189,7 @@ async fn linked(
         title,
         &mut body,
         &format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png"),
-        true
+        false
     ).await;
 }
 async fn applications(

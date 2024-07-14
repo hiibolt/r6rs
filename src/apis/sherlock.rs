@@ -11,14 +11,14 @@ pub async fn get_and_stringify_potential_profiles(
     title: &str, 
     body: &mut String, 
     url: &str,
-    no_special_characters: bool
+    allow_all: bool
 ) {
     let mut invalid_usernames = HashSet::new();
     let mut valid_usernames = HashSet::new();
 
     for username in usernames.iter() {
         // If the username is bad, let the user know.
-        if !is_valid_sherlock_username(&username, no_special_characters) {
+        if !is_valid_sherlock_username(&username, allow_all) {
             invalid_usernames.insert(username.clone());
 
             continue;
