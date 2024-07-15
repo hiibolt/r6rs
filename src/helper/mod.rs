@@ -19,7 +19,6 @@ use std::collections::HashMap;
 use anyhow::{ anyhow, bail };
 use async_recursion::async_recursion;
 use std::collections::VecDeque;
-use regex::Regex;
 
 #[derive(Clone)]
 pub struct BackendHandles {
@@ -119,68 +118,63 @@ impl R6RSCommand {
     #[async_recursion]
     pub async fn print_help(
         &mut self,
+        prefix: String,
         level: usize
-    ) -> Vec<(String, String)> {
-        let mut root_body = Vec::new();
-        let mut leaf_body = Vec::new();
+    ) -> String {
+        let mut body = String::from("\n");
 
-        let header: String;
-        match &mut self.inner {
-            R6RSCommandType::RootCommand(R6RSRootCommand{ commands, section_title }) => {
-                for (name, command) in commands {
-                    match &command.inner {
-                        R6RSCommandType::RootCommand(_) => {
-                            let mut nested_commands = command.print_help(level + 1).await;
-                            
-                            nested_commands = nested_commands
-                                .iter()
-                                .map(|(name_upper, description)| (format!("{} {}", name, name_upper), description.to_owned()))
-                                .collect();
+        let R6RSRootCommand{ commands, section_title } = if let R6RSCommandType::RootCommand(root_command) = &mut self.inner {
+            root_command
+        } else {
+            panic!("Cannot print help for a leaf command!");
+        };
 
-                            root_body.append(nested_commands.as_mut());
-                        },
-                        R6RSCommandType::LeafCommand(R6RSLeafCommand{required_authorization: _, valid_args, function: _}) => {
-                            let mut description = command.description.to_owned();
+        let mut subsection_count: usize = 0;
+        // Handle subsections first
+        body += &format!("{} {section_title}\n", "#".repeat(level));
+        for (name, command) in commands.iter_mut() {
+            match &command.inner {
+                R6RSCommandType::RootCommand(_) => {
+                    subsection_count += 1;
+                    let nested_print = command.print_help(
+                        prefix.clone() + " " + &name,
+                        level + 1
+                    ).await;
+                    
+                    body += &nested_print;
+                },
+                _ => ()
+            }
+        }
+        // Handle leaf commands
+        let mut leaf_body = String::new();
+        for (name, command) in commands.iter_mut() {
+            match &command.inner {
+                R6RSCommandType::LeafCommand(R6RSLeafCommand{required_authorization: _, valid_args, function: _}) => {
+                    let description = command.description.to_owned();
 
-                            for arg_set in valid_args {
-                                description.push_str(&format!("\n- `...{name}"));
+                    for arg_set in valid_args {
+                        leaf_body.push_str(&format!("\n`{prefix} {name}"));
 
-                                for arg in arg_set {
-                                    description.push_str(&format!(" <{}>", arg));
-                                }
-
-                                description.push('`');
-                            }
-                            
-                            leaf_body.push((name.to_owned(), description));
+                        for arg in arg_set {
+                            leaf_body += &format!(" <{}>", arg);
                         }
-                    }
-                }
 
-                header = section_title.clone();
-            },
-            R6RSCommandType::LeafCommand(_) => {
-                panic!("Cannot print help for a leaf command!");
+                        leaf_body += "`";
+                    }
+
+                    leaf_body += &format!("\n- {description}");
+                }
+                _ => ()
             }
         }
 
-        // Regex to match markdown titles
-        let title_regex = Regex::new(r"# (.+)").unwrap();
-        root_body = root_body.into_iter()
-            .map(|(name, description)| {
-                (title_regex.replace_all(&name, "## $1").to_string(), description)
-            })
-            .collect();
-
-        // Sort and combine the two bodies
-        root_body.sort();
-        leaf_body.sort();
-        root_body.append(leaf_body.as_mut());
-
-        let hashtags = "#".repeat(level);
-        root_body.insert(0, (format!("{hashtags} {header}"), self.description.to_owned()));
-
-        root_body
+        if subsection_count > 0 && leaf_body.len() != 0 {
+            body += &format!("\n{} Other\n", "#".repeat(level + 1));
+        }
+        body += &leaf_body;
+        
+        body
     }
 
     #[async_recursion]
@@ -200,21 +194,7 @@ impl R6RSCommand {
                 if next_command == "help" || next_command == ">>help" {
                     let mut body = self.description.to_owned() + "\n";
                     
-                    body.push_str(&self.print_help(1).await
-                        .iter()
-                        .flat_map(|line| {
-                            if let Some(first) = line.0.chars().next() {
-                                if first == '#' {
-                                    Some(format!("\n{}", line.0))
-                                } else {
-                                    Some(format!("\n**`{}`**\n{}", line.0, line.1))
-                                }
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<Vec<String>>()
-                        .join("\n"));
+                    body.push_str(&self.print_help(String::new(), 1).await);
 
                     send_embed_no_return(
                         ctx, 
