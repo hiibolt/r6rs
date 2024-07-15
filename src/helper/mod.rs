@@ -124,7 +124,7 @@ impl R6RSCommand {
         let mut root_body = Vec::new();
         let mut leaf_body = Vec::new();
 
-        let mut header: String;
+        let header: String;
         match &mut self.inner {
             R6RSCommandType::RootCommand(R6RSRootCommand{ commands, section_title }) => {
                 for (name, command) in commands {
