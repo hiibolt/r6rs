@@ -5,9 +5,6 @@ use crate::helper::BackendHandles;
 use crate::helper::R6RSCommand;
 use crate::VecDeque;
 use crate::Message;
-use crate::send_embed;
-use crate::Arc;
-use tokio::sync::Mutex;
 use crate::helper::save;
 
 
@@ -99,14 +96,16 @@ pub async fn blacklist(
 
 pub async fn build_admin_commands() -> R6RSCommand {
     let mut admin_nest_command = R6RSCommand::new_root(
-        String::from("Admin commands, generally intended only for usage by the owner.")
+        String::from("Admin commands, generally intended only for usage by the owner."),
+        String::from("Admin")
     );
     admin_nest_command.attach(
         String::from("blacklist"),
         R6RSCommand::new_leaf(
             String::from("Removes a person from the authorized user list."),
             AsyncFnPtr::new(blacklist),
-            vec!(vec!(String::from("section"), String::from("user id")))
+            vec!(vec!(String::from("section"), String::from("user id"))),
+            Some(String::from("admin"))
         )
     );
     admin_nest_command.attach(
@@ -114,33 +113,10 @@ pub async fn build_admin_commands() -> R6RSCommand {
         R6RSCommand::new_leaf(
             String::from("Adds a person to the authorized user list."),
             AsyncFnPtr::new(whitelist),
-            vec!(vec!(String::from("section"), String::from("user id")))
+            vec!(vec!(String::from("section"), String::from("user id"))),
+            Some(String::from("admin")),
         )
     );
 
     admin_nest_command
-}
-pub async fn admin(
-    admin_nest_command: Arc<Mutex<R6RSCommand>>,
-
-    backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: Message,
-    args: VecDeque<String> 
-) {
-    if let Err(err) = admin_nest_command.lock().await.call(
-        backend_handles,
-        ctx.clone(), 
-        msg.clone(), 
-        args
-    ).await {
-        println!("Failed! [{err}]");
-        send_embed(
-            &ctx, 
-            &msg, 
-            "Admin - Blacklist Error", 
-            &format!("Failed for reason:\n\n\"{err}\""), 
-            get_random_anime_girl()
-        ).await.unwrap();
-    }
 }

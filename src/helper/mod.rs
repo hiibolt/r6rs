@@ -19,6 +19,7 @@ use std::collections::HashMap;
 use anyhow::{ anyhow, bail };
 use async_recursion::async_recursion;
 use std::collections::VecDeque;
+use regex::Regex;
 
 #[derive(Clone)]
 pub struct BackendHandles {
@@ -62,9 +63,18 @@ impl <R> AsyncFnPtr<R> {
         (self.func)(backend_handles, ctx, msg, args).await
     }
 }
+pub struct R6RSLeafCommand {
+    pub function: AsyncFnPtr<Result<(), String>>,
+    pub required_authorization: Option<String>,
+    pub valid_args: Vec<Vec<String>>
+}
+pub struct R6RSRootCommand {
+    pub commands: HashMap<String, Box<R6RSCommand>>,
+    pub section_title: String
+}
 pub enum R6RSCommandType {
-    RootCommand(HashMap<String, Box<R6RSCommand>>),
-    LeafCommand((AsyncFnPtr<Result<(), String>>, Vec<Vec<String>>))
+    RootCommand(R6RSRootCommand),
+    LeafCommand(R6RSLeafCommand)
 }
 pub struct R6RSCommand
 {
@@ -73,20 +83,22 @@ pub struct R6RSCommand
 }
 impl R6RSCommand {
     pub fn new_root(
-        description: String
+        description: String,
+        section_title: String
     ) -> R6RSCommand {
         R6RSCommand {
-            inner: R6RSCommandType::RootCommand(HashMap::new()),
+            inner: R6RSCommandType::RootCommand(R6RSRootCommand{ commands: HashMap::new(), section_title }),
             description
         }
     }
     pub fn new_leaf(
         description: String,
-        f: AsyncFnPtr<Result<(), String>>,
-        valid_args: Vec<Vec<String>>
+        function: AsyncFnPtr<Result<(), String>>,
+        valid_args: Vec<Vec<String>>,
+        required_authorization: Option<String>
     ) -> R6RSCommand {
         R6RSCommand {
-            inner: R6RSCommandType::LeafCommand((f, valid_args)),
+            inner: R6RSCommandType::LeafCommand(R6RSLeafCommand { function, required_authorization, valid_args }),
             description
         }
     }
@@ -97,8 +109,8 @@ impl R6RSCommand {
         command: R6RSCommand
     ) {
         match &mut self.inner {
-            R6RSCommandType::RootCommand(commands) => {
-                commands.insert(name, Box::new(command));
+            R6RSCommandType::RootCommand(root_command) => {
+                root_command.commands.insert(name, Box::new(command));
             },
             _ => panic!("Cannot attach a command to a leaf command!")
         }
@@ -106,29 +118,32 @@ impl R6RSCommand {
 
     #[async_recursion]
     pub async fn print_help(
-        &mut self
+        &mut self,
+        level: usize
     ) -> Vec<(String, String)> {
-        let mut body = Vec::new();
+        let mut root_body = Vec::new();
+        let mut leaf_body = Vec::new();
 
+        let mut header: String;
         match &mut self.inner {
-            R6RSCommandType::RootCommand(commands) => {
+            R6RSCommandType::RootCommand(R6RSRootCommand{ commands, section_title }) => {
                 for (name, command) in commands {
                     match &command.inner {
                         R6RSCommandType::RootCommand(_) => {
-                            let mut nested_commands = command.print_help().await;
-
+                            let mut nested_commands = command.print_help(level + 1).await;
+                            
                             nested_commands = nested_commands
                                 .iter()
                                 .map(|(name_upper, description)| (format!("{} {}", name, name_upper), description.to_owned()))
                                 .collect();
 
-                            body.append(nested_commands.as_mut());
+                            root_body.append(nested_commands.as_mut());
                         },
-                        R6RSCommandType::LeafCommand((_, valid_args)) => {
+                        R6RSCommandType::LeafCommand(R6RSLeafCommand{required_authorization: _, valid_args, function: _}) => {
                             let mut description = command.description.to_owned();
 
                             for arg_set in valid_args {
-                                description.push_str(&format!("\n- `{name}"));
+                                description.push_str(&format!("\n- `...{name}"));
 
                                 for arg in arg_set {
                                     description.push_str(&format!(" <{}>", arg));
@@ -137,17 +152,35 @@ impl R6RSCommand {
                                 description.push('`');
                             }
                             
-                            body.push((name.to_owned(), description));
+                            leaf_body.push((name.to_owned(), description));
                         }
                     }
                 }
+
+                header = section_title.clone();
             },
             R6RSCommandType::LeafCommand(_) => {
                 panic!("Cannot print help for a leaf command!");
             }
         }
 
-        body
+        // Regex to match markdown titles
+        let title_regex = Regex::new(r"# (.+)").unwrap();
+        root_body = root_body.into_iter()
+            .map(|(name, description)| {
+                (title_regex.replace_all(&name, "## $1").to_string(), description)
+            })
+            .collect();
+
+        // Sort and combine the two bodies
+        root_body.sort();
+        leaf_body.sort();
+        root_body.append(leaf_body.as_mut());
+
+        let hashtags = "#".repeat(level);
+        root_body.insert(0, (format!("{hashtags} {header}"), self.description.to_owned()));
+
+        root_body
     }
 
     #[async_recursion]
@@ -159,17 +192,27 @@ impl R6RSCommand {
         mut args: VecDeque<String>
     ) -> Result<()> {
         match &mut self.inner {
-            R6RSCommandType::RootCommand(commands) => {
+            R6RSCommandType::RootCommand(R6RSRootCommand{ commands, section_title: _}) => {
                 let next_command = args
                     .pop_front()
                     .ok_or(anyhow!("Missing subcommand!"))?;
 
-                if next_command == "help" {
+                if next_command == "help" || next_command == ">>help" {
                     let mut body = self.description.to_owned() + "\n";
                     
-                    body.push_str(&self.print_help().await
+                    body.push_str(&self.print_help(1).await
                         .iter()
-                        .map(|line| format!("\n**`{}`**\n{}", line.0, line.1))
+                        .flat_map(|line| {
+                            if let Some(first) = line.0.chars().next() {
+                                if first == '#' {
+                                    Some(format!("\n{}", line.0))
+                                } else {
+                                    Some(format!("\n**`{}`**\n{}", line.0, line.1))
+                                }
+                            } else {
+                                None
+                            }
+                        })
                         .collect::<Vec<String>>()
                         .join("\n"));
 
@@ -195,8 +238,23 @@ impl R6RSCommand {
                 println!("Root command!");
                 Ok(())
             },
-            R6RSCommandType::LeafCommand((f, _)) => {
-                f.run(backend_handles, ctx, msg, args).await
+            R6RSCommandType::LeafCommand(R6RSLeafCommand{function, required_authorization, valid_args: _}) => {
+                // Verify that the sender of the message is in the required section
+                if let Some(required_section) = required_authorization {
+                    if !backend_handles.state.lock().await
+                        .bot_data
+                        .get("whitelisted_user_ids").ok_or(anyhow!("Missing whitelisted IDs JSON value!"))?
+                        .get(&*required_section).ok_or(anyhow!("Missing that section's JSON value!"))?
+                        .as_array().ok_or(anyhow!("That section isn't an array!"))?
+                        .iter()
+                        .any(|val| val.as_i64().expect("Unreachable") == msg.author.id.get() as i64) {
+                        no_access(ctx, msg.clone(), &msg.content, msg.author.id.get()).await;
+                        
+                        return Ok(());
+                    }
+                }
+                
+                function.run(backend_handles, ctx, msg, args).await
                     .map_err(|e| anyhow!("Encountered an error!\n\n{e:#?}"))
             }
         }

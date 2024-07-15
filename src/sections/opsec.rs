@@ -1,5 +1,4 @@
 use crate::apis::get_and_stringify_potential_profiles;
-use crate::helper::get_random_anime_girl;
 use crate::helper::send_embed_no_return;
 use crate::helper::AsyncFnPtr;
 use crate::helper::BackendHandles;
@@ -288,14 +287,16 @@ pub async fn applications(
 
 pub async fn build_opsec_commands() -> R6RSCommand {
     let mut opsec_nest_command = R6RSCommand::new_root(
-        String::from("Commands for location information on Ubisoft Connect accounts.")
+        String::from("Commands for location information on Ubisoft Connect accounts."),
+        String::from("OPSEC")
     );
     opsec_nest_command.attach(
         String::from("pc"),
         R6RSCommand::new_leaf(
             String::from("Lookups up a Ubisoft account based on their registered PC username"),
             AsyncFnPtr::new(lookup_pc),
-            vec!(vec!(String::from("username")))
+            vec!(vec!(String::from("username"))),
+            Some(String::from("opsec"))
         )
     );
     opsec_nest_command.attach(
@@ -303,7 +304,8 @@ pub async fn build_opsec_commands() -> R6RSCommand {
         R6RSCommand::new_leaf(
             String::from("Lookups up a Ubisoft account based on their registered Xbox username"),
             AsyncFnPtr::new(lookup_xbox),
-            vec!(vec!(String::from("username")))
+            vec!(vec!(String::from("username"))),
+            Some(String::from("opsec"))
         )
     );
     opsec_nest_command.attach(
@@ -311,7 +313,8 @@ pub async fn build_opsec_commands() -> R6RSCommand {
         R6RSCommand::new_leaf(
             String::from("Lookups up a Ubisoft account based on their registered PSN username"),
             AsyncFnPtr::new(lookup_psn),
-            vec!(vec!(String::from("username")))
+            vec!(vec!(String::from("username"))),
+            Some(String::from("opsec"))
         )
     );
     opsec_nest_command.attach(
@@ -319,33 +322,10 @@ pub async fn build_opsec_commands() -> R6RSCommand {
         R6RSCommand::new_leaf(
             String::from("Lookups up a Ubisoft account based on their username (PC only)"),
             AsyncFnPtr::new(applications),
-            vec!(vec!(String::from("username")))
+            vec!(vec!(String::from("username"))),
+            Some(String::from("opsec"))
         )
     );
 
     opsec_nest_command
-}
-pub async fn opsec( 
-    opsec_nest_command: Arc<Mutex<R6RSCommand>>,
-
-    backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: Message,
-    args: VecDeque<String> 
-) {
-    if let Err(err) = opsec_nest_command.lock().await.call(
-        backend_handles,
-        ctx.clone(), 
-        msg.clone(), 
-        args
-    ).await {
-        println!("Failed! [{err}]");
-        send_embed(
-            &ctx, 
-            &msg, 
-            "OPSEC - Blacklist Error", 
-            &format!("Failed for reason:\n\n\"{err}\""), 
-            get_random_anime_girl()
-        ).await.unwrap();
-    }
 }

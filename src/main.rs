@@ -4,8 +4,7 @@ mod sections;
 mod apis;
 
 use crate::{
-    sections::{ econ, opsec, admin, osint },
-    helper::{ no_access, send_embed, get_random_anime_girl },
+    helper::{ send_embed, get_random_anime_girl },
     apis::{ Snusbase, BulkVS, Ubisoft, Database }
 };
 
@@ -35,10 +34,7 @@ struct State {
 }
 
 struct Bot {
-    admin_commands: Arc<Mutex<R6RSCommand>>,
-    econ_commands: Arc<Mutex<R6RSCommand>>,
-    osint_commands: Arc<Mutex<R6RSCommand>>,
-    opsec_commands: Arc<Mutex<R6RSCommand>>,
+    root_command: Arc<Mutex<R6RSCommand>>,
 
     backend_handles: BackendHandles
 }
@@ -50,7 +46,7 @@ impl EventHandler for Bot {
         ctx: serenity::client::Context, 
         msg: Message
     ) {
-        let mut args: VecDeque<String> = msg.content
+        let args: VecDeque<String> = msg.content
             .clone()
             .split(' ')
             .map(|i| String::from(i))
@@ -61,12 +57,11 @@ impl EventHandler for Bot {
             .and_then(|gid| Some(gid.get()))
             .unwrap_or(0u64);
 
-        let front_arg = args.pop_front().unwrap();
+        let front_arg = args.clone().pop_front().unwrap();
 
         if &front_arg.chars().take(2).collect::<String>() != ">>" {
             return;
         }
-
 
         if let Err(e) = self.backend_handles.database
             .lock().await
@@ -78,82 +73,21 @@ impl EventHandler for Bot {
             }) {
             println!("Failed to update DB with reason `{e}`!");
         }
-
-        match front_arg.chars().skip(2).collect::<String>().as_str() {
-            "r6" => {
-                match args
-                    .pop_front()
-                    .unwrap_or(String::from("help"))
-                    .as_str()
-                {
-                    "econ" => {
-                        // Check if they're not on the whitelist
-                        if !self.backend_handles.state
-                            .lock().await
-                            .bot_data["whitelisted_user_ids"]["econ"]
-                            .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!")
-                            .iter()
-                            .any(|x| x.as_u64().expect("User ids need to be numbers!") == user_id)
-                        {
-                            no_access( ctx, msg.clone(), "econ", user_id ).await;
-                            return;
-                        }
-
-                        // Otherwise, go ahead
-                        tokio::spawn(econ(self.econ_commands.clone(), self.backend_handles.clone(), ctx, msg, args));
-                    },
-                    "opsec" => {
-                        // Check if they're not on the whitelist
-                        if !self.backend_handles.state
-                            .lock().await
-                            .bot_data["whitelisted_user_ids"]["opsec"]
-                            .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!")
-                            .iter()
-                            .any(|x| x.as_u64().expect("User ids need to be numbers!") == user_id)
-                        {
-                            no_access( ctx, msg.clone(), "opsec", user_id ).await;
-                            return;
-                        }
-
-                        // Otherwise, go ahead
-                        tokio::spawn(opsec(self.opsec_commands.clone(), self.backend_handles.clone(), ctx, msg, args)); 
-                    },
-                    "admin" => {
-                        // Check if they're not on the whitelist
-                        if !self.backend_handles.state
-                            .lock().await
-                            .bot_data["whitelisted_user_ids"]["admin"]
-                            .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!")
-                            .iter()
-                            .any(|x| x.as_u64().expect("User ids need to be numbers!") == user_id)
-                        {
-                            no_access( ctx, msg.clone(), "admin", user_id ).await;
-                            return;
-                        }
-
-                        // Otherwise, go ahead
-                        tokio::spawn(admin( self.admin_commands.clone(), self.backend_handles.clone(), ctx, msg, args ));
-                    },
-                    _ => { tokio::spawn(help(ctx, msg)); }
-                } 
-            },
-            "osint" => {
-                // Check if they're not on the whitelist
-                if !self.backend_handles.state
-                    .lock().await
-                    .bot_data["whitelisted_user_ids"]["osint"]
-                    .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!")
-                    .iter()
-                    .any(|x| x.as_u64().expect("User ids need to be numbers!") == user_id)
-                {
-                    no_access( ctx, msg.clone(), "osint", user_id ).await;
-                    return;
-                }
-
-                // Otherwise, go ahead
-                tokio::spawn(osint(self.osint_commands.clone(), self.backend_handles.clone(), ctx, msg, args)); 
-            }
-            _ => { tokio::spawn(help(ctx, msg)); }
+        
+        if let Err(err) = self.root_command.lock().await.call(
+            self.backend_handles.clone(),
+            ctx.clone(), 
+            msg.clone(), 
+            args
+        ).await {
+            println!("Failed! [{err}]");
+            send_embed(
+                &ctx, 
+                &msg, 
+                "R6RS - Error", 
+                &format!("Failed for reason:\n\n\"{err}\""), 
+                get_random_anime_girl()
+            ).await.unwrap();
         }
     }
 
@@ -378,14 +312,38 @@ async fn main() -> Result<()> {
     // Start autopull
     tokio::spawn(helper::autopull( state.clone() ));
 
-    let admin_commands = 
-        Arc::new(Mutex::new(sections::admin::build_admin_commands().await));
-    let econ_commands = 
-        Arc::new(Mutex::new(sections::econ::build_econ_commands().await));
-    let osint_commands =
-        Arc::new(Mutex::new(sections::osint::build_osint_commands().await));
-    let opsec_commands = 
-        Arc::new(Mutex::new(sections::opsec::build_opsec_commands().await));
+    let admin_commands   = sections::admin::build_admin_commands().await;
+    let econ_commands    = sections::econ::build_econ_commands().await;
+    let osint_commands   = sections::osint::build_osint_commands().await;
+    let opsec_commands   = sections::opsec::build_opsec_commands().await;
+    let mut root_command = R6RSCommand::new_root(
+        String::from("R6RS is a general purpose bot, orignally intended for Rainbow Six Siege, but since multipurposed into a powerful general OSINT tool."),
+        String::from("Queries")
+    );
+    let mut r6_root_command = R6RSCommand::new_root(
+        String::from("Commands specifically related to R6."),
+        String::from("R6")
+    );
+    r6_root_command.attach(
+        String::from("econ"),
+        econ_commands
+    );
+    r6_root_command.attach(
+        String::from("opsec"),
+        opsec_commands
+    );
+    root_command.attach(
+        String::from(">>r6"),
+        r6_root_command
+    );
+    root_command.attach(
+        String::from(">>admin"),
+        admin_commands
+    );
+    root_command.attach(
+        String::from(">>osint"),
+        osint_commands
+    );
     
 
     let backend_handles = BackendHandles {
@@ -400,10 +358,7 @@ async fn main() -> Result<()> {
     let mut client =
         Client::builder(&token, intents)
         .event_handler(Bot {
-            admin_commands,
-            econ_commands,
-            osint_commands,
-            opsec_commands,
+            root_command: Arc::new(Mutex::new(root_command)),
 
             backend_handles
         })

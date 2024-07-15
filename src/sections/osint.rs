@@ -536,10 +536,14 @@ pub async fn sherlock(
 pub async fn build_osint_commands() -> R6RSCommand {
 
     let mut osint_nest_command = R6RSCommand::new_root(
-        String::from("Commands for gather Open Source Intelligence (OSINT). Please see the GitHub for Terms of Usage.")
+        String::from("Commands for gather Open Source Intelligence (OSINT). Please see the GitHub for Terms of Usage."),
+        String::from("OSINT")
     );
     // Create a nest for query-based commands
-    let mut query_nest_command = R6RSCommand::new_root(String::from("Query-based commands for OSINT."));
+    let mut query_nest_command = R6RSCommand::new_root(
+        String::from("Query-based commands for OSINT."),
+        String::from("Queries")
+    );
     
     // Attach the query-based commands to the query nest
     query_nest_command.attach(
@@ -547,7 +551,8 @@ pub async fn build_osint_commands() -> R6RSCommand {
         R6RSCommand::new_leaf(
             String::from("Queries for leaks based on an email."),
             AsyncFnPtr::new(query_email),
-            vec!(vec!(String::from("email")))
+            vec!(vec!(String::from("email"))),
+            Some(String::from("osint"))
         )
     );
     query_nest_command.attach(
@@ -555,7 +560,8 @@ pub async fn build_osint_commands() -> R6RSCommand {
         R6RSCommand::new_leaf(
             String::from("Queries for leaks based on a username."),
             AsyncFnPtr::new(query_username),
-            vec!(vec!(String::from("username")))
+            vec!(vec!(String::from("username"))),
+            Some(String::from("osint"))
         )
     );
     query_nest_command.attach(
@@ -563,7 +569,8 @@ pub async fn build_osint_commands() -> R6RSCommand {
         R6RSCommand::new_leaf(
             String::from("Queries for leaks based on a last IP."),
             AsyncFnPtr::new(query_last_ip),
-            vec!(vec!(String::from("ip")))
+            vec!(vec!(String::from("ip"))),
+            Some(String::from("osint"))
         )
     );
     query_nest_command.attach(
@@ -571,7 +578,8 @@ pub async fn build_osint_commands() -> R6RSCommand {
         R6RSCommand::new_leaf(
             String::from("Queries for leaks based on a hash."),
             AsyncFnPtr::new(query_hash),
-            vec!(vec!(String::from("hash")))
+            vec!(vec!(String::from("hash"))),
+            Some(String::from("osint"))
         )
     );
     query_nest_command.attach(
@@ -579,7 +587,8 @@ pub async fn build_osint_commands() -> R6RSCommand {
         R6RSCommand::new_leaf(
             String::from("Queries for leaks based on a password."),
             AsyncFnPtr::new(query_password),
-            vec!(vec!(String::from("password")))
+            vec!(vec!(String::from("password"))),
+            Some(String::from("osint"))
         )
     );
     query_nest_command.attach(
@@ -587,7 +596,8 @@ pub async fn build_osint_commands() -> R6RSCommand {
         R6RSCommand::new_leaf(
             String::from("Queries for leaks based on a name."),
             AsyncFnPtr::new(query_name),
-            vec!(vec!(String::from("name")))
+            vec!(vec!(String::from("name"))),
+            Some(String::from("osint"))
         )
     );
 
@@ -598,7 +608,10 @@ pub async fn build_osint_commands() -> R6RSCommand {
     );
 
     // Create the nest for hash-based commands
-    let mut hash_nest_command = R6RSCommand::new_root(String::from("Hash-based commands for OSINT."));
+    let mut hash_nest_command = R6RSCommand::new_root(
+        String::from("Hash-based commands for OSINT."),
+        String::from("Hashing")
+    );
 
     // Attach the hash-based commands to the hash nest
     hash_nest_command.attach(
@@ -606,7 +619,8 @@ pub async fn build_osint_commands() -> R6RSCommand {
         R6RSCommand::new_leaf(
             String::from("Dehashes a hash into pre-cracked passwords."),
             AsyncFnPtr::new(dehash),
-            vec!(vec!(String::from("hash")))
+            vec!(vec!(String::from("hash"))),
+            Some(String::from("osint"))
         )
     );
     hash_nest_command.attach(
@@ -614,7 +628,8 @@ pub async fn build_osint_commands() -> R6RSCommand {
         R6RSCommand::new_leaf(
             String::from("Rehashes a password into pre-hashed hashes."),
             AsyncFnPtr::new(rehash),
-            vec!(vec!(String::from("password")))
+            vec!(vec!(String::from("password"))),
+            Some(String::from("osint"))
         )
     );
 
@@ -630,7 +645,8 @@ pub async fn build_osint_commands() -> R6RSCommand {
         R6RSCommand::new_leaf(
             String::from("Perform a Caller ID lookup on a phone number."),
             AsyncFnPtr::new(cnam_lookup),
-            vec!(vec!(String::from("phone number")))
+            vec!(vec!(String::from("phone number"))),
+            Some(String::from("osint"))
         )
     );
     osint_nest_command.attach(
@@ -638,7 +654,8 @@ pub async fn build_osint_commands() -> R6RSCommand {
         R6RSCommand::new_leaf(
             String::from("Geolocates an IP."),
             AsyncFnPtr::new(geolocate),
-            vec!(vec!(String::from("ip")))
+            vec!(vec!(String::from("ip"))),
+            Some(String::from("osint"))
         )
     );
     osint_nest_command.attach(
@@ -646,33 +663,10 @@ pub async fn build_osint_commands() -> R6RSCommand {
         R6RSCommand::new_leaf(
             String::from("Cross-references sites with a given username."),
             AsyncFnPtr::new(sherlock),
-            vec!(vec!(String::from("username")))
+            vec!(vec!(String::from("username"))),
+            Some(String::from("osint"))
         )
     );
 
     osint_nest_command
-}
-pub async fn osint ( 
-    osint_nest_command: Arc<Mutex<R6RSCommand>>,
-
-    backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: Message,
-    args: VecDeque<String> 
-) {
-    if let Err(err) = osint_nest_command.lock().await.call(
-        backend_handles,
-        ctx.clone(), 
-        msg.clone(), 
-        args
-    ).await {
-        println!("Failed! [{err}]");
-        send_embed(
-            &ctx, 
-            &msg, 
-            "OSINT - Blacklist Error", 
-            &format!("Failed for reason:\n\n\"{err}\""), 
-            get_random_anime_girl()
-        ).await.unwrap();
-    }
 }

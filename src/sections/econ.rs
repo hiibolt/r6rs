@@ -12,7 +12,6 @@ use crate::{
     Mutex,
     Arc
 };
-use crate::send_embed;
 use crate::State;
 use std::time::{
     SystemTime,
@@ -521,14 +520,16 @@ pub async fn profit(
 
 pub async fn build_econ_commands() -> R6RSCommand {
     let mut econ_nest_command = R6RSCommand::new_root(
-        String::from("Commands related to the Rainbow Six Siege Marketplace and its economy.")
+        String::from("Commands related to the Rainbow Six Siege Marketplace and its economy."),
+        String::from("Economy")
     );
     econ_nest_command.attach(
         String::from("list"),
         R6RSCommand::new_leaf(
             String::from("Lists all available skins."),
             AsyncFnPtr::new(list),
-            vec!(vec!(), vec!(String::from("page #")))
+            vec!(vec!(), vec!(String::from("page #"))),
+            Some(String::from("econ"))
         )
     );
     econ_nest_command.attach(
@@ -536,7 +537,8 @@ pub async fn build_econ_commands() -> R6RSCommand {
         R6RSCommand::new_leaf(
             String::from("Creates a detailed data sheet on an item."),
             AsyncFnPtr::new(analyze),
-            vec!(vec!(String::from("item name | item id")))
+            vec!(vec!(String::from("item name | item id"))),
+            Some(String::from("econ"))
         )
     );
     econ_nest_command.attach(
@@ -544,15 +546,17 @@ pub async fn build_econ_commands() -> R6RSCommand {
         R6RSCommand::new_leaf(
             String::from("Graphs the all-time history of an item."),
             AsyncFnPtr::new(graph),
-            vec!(vec!(String::from("item name | item id")))
+            vec!(vec!(String::from("item name | item id"))),
+            Some(String::from("econ"))
         )
     );
     econ_nest_command.attach(
         String::from("profit"),
         R6RSCommand::new_leaf(
-            String::from("Graphs the all-time history of an item."),
+            String::from("Calculates the amount you would make if you sold your item right now."),
             AsyncFnPtr::new(profit),
-            vec!(vec!(String::from("$ bought for"), String::from("item name | item id")))
+            vec!(vec!(String::from("$ bought for"), String::from("item name | item id"))),
+            Some(String::from("econ"))
         )
     );
     econ_nest_command.attach(
@@ -560,33 +564,10 @@ pub async fn build_econ_commands() -> R6RSCommand {
         R6RSCommand::new_leaf(
             String::from("Finds the items with the least sellers either globally or on the account with the provided login."),
             AsyncFnPtr::new(transfer),
-            vec!(vec!(), vec!(String::from("Ubisoft email"), String::from("Ubisoft password")))
+            vec!(vec!(), vec!(String::from("ubisoft email"), String::from("ubisoft password"))),
+            Some(String::from("econ"))
         )
     );
 
     econ_nest_command
-}
-pub async fn econ(
-    econ_nest_command: Arc<Mutex<R6RSCommand>>,
-
-    backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: Message,
-    args: VecDeque<String>
-) {
-    if let Err(err) = econ_nest_command.lock().await.call(
-        backend_handles,
-        ctx.clone(), 
-        msg.clone(), 
-        args
-    ).await {
-        println!("Failed! [{err}]");
-        send_embed(
-            &ctx, 
-            &msg, 
-            "Admin - Blacklist Error", 
-            &format!("Failed for reason:\n\n\"{err}\""), 
-            get_random_anime_girl()
-        ).await.unwrap();
-    }
 }
