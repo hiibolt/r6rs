@@ -135,7 +135,7 @@ impl EventHandler for Bot {
                         tokio::spawn(admin( self.state.clone(), ctx, msg, args ));
                     },
                     _ => { tokio::spawn(help(ctx, msg)); }
-                }
+                } 
             },
             "osint" => {
                 // Check if they're not on the whitelist

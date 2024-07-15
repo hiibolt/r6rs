@@ -1,4 +1,7 @@
 use crate::helper::get_random_anime_girl;
+use crate::helper::send_embed_no_return;
+use crate::helper::AsyncFnPtr;
+use crate::helper::R6RSCommand;
 use crate::VecDeque;
 use crate::Message;
 use crate::send_embed;
@@ -6,7 +9,13 @@ use crate::State;
 use crate::{ Arc, Mutex };
 use crate::helper::save;
 
-pub async fn whitelist( state: Arc<Mutex<State>>, mut args: VecDeque<String> ) -> Result<(), String> {
+
+pub async fn whitelist(
+    state: Arc<Mutex<State>>,
+    ctx: serenity::client::Context,
+    msg: Message,
+    mut args: VecDeque<String>
+) -> Result<(), String> {
     // Get the input
     let section = args
         .pop_front()
@@ -28,9 +37,23 @@ pub async fn whitelist( state: Arc<Mutex<State>>, mut args: VecDeque<String> ) -
     // Save
     save( state ).await;
 
+    send_embed_no_return(
+        ctx, 
+        msg, 
+        "Admin - Whitelist Success", 
+        &format!("Successfully added person to section!"), 
+        get_random_anime_girl()
+    ).await
+        .map_err(|e| format!("{e:?}"))?;
+
     Ok(())
 }
-pub async fn blacklist( state: Arc<Mutex<State>>, mut args: VecDeque<String> ) -> Result<(), String> {
+pub async fn blacklist(
+    state: Arc<Mutex<State>>,
+    ctx: serenity::client::Context,
+    msg: Message,
+    mut args: VecDeque<String>
+) -> Result<(), String> {
     // Get the input
     let section = args
         .pop_front()
@@ -61,87 +84,52 @@ pub async fn blacklist( state: Arc<Mutex<State>>, mut args: VecDeque<String> ) -
     // Save
     save( state ).await;
 
-    Ok(())
-}
-pub async fn help( ctx: serenity::client::Context, msg: Message ) {
-    send_embed(
-        &ctx, 
-        &msg, 
-        "ADMIN - Help", 
-        &format!("**Command List**:\n- `>>r6 admin whitelist <section> <user id>`\n- `>>r6 admin blacklist <section> <user id>`\n- `>>r6 admin help`"), 
+    println!("Admin - Blacklist Success!");
+    send_embed_no_return(
+        ctx, 
+        msg, 
+        "Success", 
+        &format!("Successfully removed person from section, if they existed!"), 
         get_random_anime_girl()
     ).await.unwrap();
+
+    Ok(())
 }
-pub async fn admin( state: Arc<Mutex<State>>, ctx: serenity::client::Context, msg: Message, mut args: VecDeque<String> ) {
-    match args
-        .pop_front()
-        .unwrap_or(String::from("help"))
-        .as_str()
-    {
-        "whitelist" => {
-            tokio::spawn(async move {
-                match whitelist( state, args ).await {
-                    Ok(_) => {
-                        println!("Success!");
-                        send_embed(
-                            &ctx, 
-                            &msg, 
-                            "Admin - Whitelist Success", 
-                            &format!("Successfully added person to section!"), 
-                            get_random_anime_girl()
-                        ).await.unwrap();
-                    },
-                    Err(err) => {
-                        println!("Failed! [{err}]");
-                        send_embed(
-                            &ctx, 
-                            &msg, 
-                            "Admin - Whitelist Error", 
-                            &format!("Failed for reason \"{err}\""), 
-                            get_random_anime_girl()
-                        ).await.unwrap();
-                    }
-                }
-            });
-        },
-        "blacklist" => {
-            tokio::spawn(async move {
-                match blacklist( state, args ).await {
-                    Ok(_) => {
-                        println!("Admin - Blacklist Success!");
-                        send_embed(
-                            &ctx, 
-                            &msg, 
-                            "Success", 
-                            &format!("Successfully removed person from section, if they existed!"), 
-                            get_random_anime_girl()
-                        ).await.unwrap();
-                    },
-                    Err(err) => {
-                        println!("Failed! [{err}]");
-                        send_embed(
-                            &ctx, 
-                            &msg, 
-                            "Admin - Blacklist Error", 
-                            &format!("Failed for reason \"{err}\""), 
-                            get_random_anime_girl()
-                        ).await.unwrap();
-                    }
-                }
-            });
-        },
-        "help" => {
-            tokio::spawn(help( ctx, msg ));
-        }
-        nonexistant => {
-            send_embed(
-                &ctx, 
-                &msg, 
-                "Command does not exist", 
-                &format!("The command **{nonexistant}** is not valid!\n\n**Valid commands**:\nrecent\nwatch\nunwatch\nwatchlist"), 
-                get_random_anime_girl()
-            ).await
-                .unwrap();
-        }
+
+pub async fn admin(
+    state: Arc<Mutex<State>>,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String> 
+) {
+    let mut admin_nest_command = R6RSCommand::new_root(
+        String::from("Admin nest command")
+    );
+    admin_nest_command.attach(
+        String::from("blacklist"),
+        R6RSCommand::new_leaf(
+            String::from("Removes a person from the authorized user list."),
+            AsyncFnPtr::new(blacklist),
+            vec!(vec!(String::from("section"), String::from("user id")))
+        )
+    );
+    admin_nest_command.attach(
+        String::from("whitelist"),
+        R6RSCommand::new_leaf(
+            String::from("Adds a person to the authorized user list."),
+            AsyncFnPtr::new(whitelist),
+            vec!(vec!(String::from("section"), String::from("user id")))
+        )
+    );
+
+    if let Err(err) = admin_nest_command.call(state, ctx.clone(), msg.clone(), args).await {
+        println!("Failed! [{err}]");
+        send_embed(
+            &ctx, 
+            &msg, 
+            "Admin - Blacklist Error", 
+            &format!("Failed for reason:\n\n\"{err}\""), 
+            get_random_anime_girl()
+        ).await.unwrap();
     }
 }

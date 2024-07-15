@@ -9,6 +9,188 @@ use serenity::model::colour::Colour;
 use serenity::all::EditMessage;
 use serenity::all::{ CreateEmbed, CreateMessage };
 use rand::prelude::SliceRandom;
+use anyhow::Result;
+use futures::future::{Future, BoxFuture};
+use std::collections::HashMap;
+use anyhow::{ anyhow, bail };
+use async_recursion::async_recursion;
+use std::collections::VecDeque;
+
+
+
+pub struct AsyncFnPtr<R> {
+    func: Box<dyn Fn(
+        Arc<Mutex<State>>,
+        serenity::client::Context,
+        Message,
+        VecDeque<String>
+    ) -> BoxFuture<'static, R> + Send + Sync + 'static>
+}
+impl <R> AsyncFnPtr<R> {
+    pub fn new<F>(
+        f: fn(
+            Arc<Mutex<State>>,
+            serenity::client::Context,
+            Message,
+            VecDeque<String>
+        ) -> F
+    ) -> AsyncFnPtr<F::Output> 
+    where 
+        F: Future<Output = R> + Send + Sync + 'static
+    {
+        AsyncFnPtr {
+            func: Box::new(move |state, ctx, msg, args| Box::pin(f(state, ctx, msg, args))),
+        }
+    }
+    pub async fn run(
+        &self,
+        state: Arc<Mutex<State>>,
+        ctx: serenity::client::Context,
+        msg: Message,
+        args: VecDeque<String>
+    ) -> R { 
+        (self.func)(state, ctx, msg, args).await
+    }
+}
+pub enum R6RSCommandType {
+    RootCommand(HashMap<String, Box<R6RSCommand>>),
+    LeafCommand((AsyncFnPtr<Result<(), String>>, Vec<Vec<String>>))
+}
+pub struct R6RSCommand
+{
+    pub inner: R6RSCommandType,
+    pub description: String,
+}
+impl R6RSCommand {
+    pub fn new_root(
+        description: String
+    ) -> R6RSCommand {
+        R6RSCommand {
+            inner: R6RSCommandType::RootCommand(HashMap::new()),
+            description
+        }
+    }
+    pub fn new_leaf(
+        description: String,
+        f: AsyncFnPtr<Result<(), String>>,
+        valid_args: Vec<Vec<String>>
+    ) -> R6RSCommand {
+        R6RSCommand {
+            inner: R6RSCommandType::LeafCommand((f, valid_args)),
+            description
+        }
+    }
+
+    pub fn attach(
+        &mut self,
+        name: String,
+        command: R6RSCommand
+    ) {
+        match &mut self.inner {
+            R6RSCommandType::RootCommand(commands) => {
+                commands.insert(name, Box::new(command));
+            },
+            _ => panic!("Cannot attach a command to a leaf command!")
+        }
+    }
+
+    #[async_recursion]
+    pub async fn print_help(
+        &mut self
+    ) -> Vec<(String, String)> {
+        let mut body = Vec::new();
+
+        match &mut self.inner {
+            R6RSCommandType::RootCommand(commands) => {
+                for (name, command) in commands {
+                    match &command.inner {
+                        R6RSCommandType::RootCommand(_) => {
+                            let mut nested_commands = command.print_help().await;
+
+                            nested_commands = nested_commands
+                                .iter()
+                                .map(|(name_upper, description)| (format!("{} {}", name, name_upper), description.to_owned()))
+                                .collect();
+
+                            body.append(nested_commands.as_mut());
+                        },
+                        R6RSCommandType::LeafCommand((_, valid_args)) => {
+                            let mut description = command.description.to_owned();
+
+                            for arg_set in valid_args {
+                                description.push_str(&format!("\n- `{name}"));
+
+                                for arg in arg_set {
+                                    description.push_str(&format!(" <{}>", arg));
+                                }
+
+                                description.push('`');
+                            }
+                            
+                            body.push((name.to_owned(), description));
+                        }
+                    }
+                }
+            },
+            R6RSCommandType::LeafCommand(_) => {
+                panic!("Cannot print help for a leaf command!");
+            }
+        }
+
+        body
+    }
+
+    #[async_recursion]
+    pub async fn call(
+        &mut self,
+        state: Arc<Mutex<State>>,
+        ctx: serenity::client::Context,
+        msg: Message,
+        mut args: VecDeque<String>
+    ) -> Result<()> {
+        match &mut self.inner {
+            R6RSCommandType::RootCommand(commands) => {
+                let next_command = args
+                    .pop_front()
+                    .ok_or(anyhow!("Missing subcommand!"))?;
+
+                if next_command == "help" {
+                    let body = self.print_help().await
+                        .iter()
+                        .map(|line| format!("### `{}`\n{}", line.0, line.1))
+                        .collect::<Vec<String>>()
+                        .join("\n");
+
+                    send_embed_no_return(
+                        ctx, 
+                        msg, 
+                        "Command Help", 
+                        &body, 
+                        get_random_anime_girl()
+                    ).await.unwrap();
+
+                    return Ok(());
+                }
+
+                if !commands.contains_key(&next_command) {
+                    bail!("Invalid subcommand!");
+                }
+
+                commands.get_mut(&next_command)
+                    .expect("Unreachable!")
+                    .call(state, ctx, msg, args).await?;
+
+                println!("Root command!");
+                Ok(())
+            },
+            R6RSCommandType::LeafCommand((f, _)) => {
+                f.run(state, ctx, msg, args).await
+                    .map_err(|e| anyhow!("Encountered an error!\n\n{e:#?}"))
+            }
+        }
+    }
+}
+
 
 pub async fn save( state: Arc<Mutex<State>> ) {
     let bot_data_serialized = &state
@@ -48,6 +230,25 @@ pub async fn autopull( state: Arc<Mutex<State>> ) {
 
         sleep(Duration::from_secs(60)).await;
     }
+}
+pub async fn send_embed_no_return(
+    ctx: serenity::client::Context,
+    msg: Message,
+    title: &str,
+    description: &str,
+    url: &str
+) -> Result<()> {
+    let embed = CreateEmbed::new()
+        .title(title)
+        .description(description)
+        .color(get_random_color())
+        .thumbnail(url);
+    
+    let builder = CreateMessage::new().embed(embed);
+    
+    tokio::spawn(msg.channel_id.send_message(ctx.http, builder));
+
+    Ok(())
 }
 pub async fn send_embed(
     ctx: &serenity::client::Context,
