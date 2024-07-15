@@ -38,6 +38,7 @@ struct Bot {
     admin_commands: Arc<Mutex<R6RSCommand>>,
     econ_commands: Arc<Mutex<R6RSCommand>>,
     osint_commands: Arc<Mutex<R6RSCommand>>,
+    opsec_commands: Arc<Mutex<R6RSCommand>>,
 
     backend_handles: BackendHandles
 }
@@ -115,7 +116,7 @@ impl EventHandler for Bot {
                         }
 
                         // Otherwise, go ahead
-                        tokio::spawn(opsec(self.backend_handles.ubisoft_api.clone(), ctx, msg, args)); 
+                        tokio::spawn(opsec(self.opsec_commands.clone(), self.backend_handles.clone(), ctx, msg, args)); 
                     },
                     "admin" => {
                         // Check if they're not on the whitelist
@@ -383,6 +384,9 @@ async fn main() -> Result<()> {
         Arc::new(Mutex::new(sections::econ::build_econ_commands().await));
     let osint_commands =
         Arc::new(Mutex::new(sections::osint::build_osint_commands().await));
+    let opsec_commands = 
+        Arc::new(Mutex::new(sections::opsec::build_opsec_commands().await));
+    
 
     let backend_handles = BackendHandles {
         ubisoft_api,
@@ -399,6 +403,7 @@ async fn main() -> Result<()> {
             admin_commands,
             econ_commands,
             osint_commands,
+            opsec_commands,
 
             backend_handles
         })

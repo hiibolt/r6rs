@@ -1,5 +1,9 @@
 use crate::apis::get_and_stringify_potential_profiles;
 use crate::helper::get_random_anime_girl;
+use crate::helper::send_embed_no_return;
+use crate::helper::AsyncFnPtr;
+use crate::helper::BackendHandles;
+use crate::helper::R6RSCommand;
 use crate::VecDeque;
 use crate::Message;
 use crate::send_embed;
@@ -102,7 +106,7 @@ async fn linked(
     msg: Message,
     args: VecDeque<String>,
     platform: String
-) {
+) -> Result<(), String> {
     let mut body = String::new();
     let title = "OPSEC - Uplay Linked Search";
 
@@ -112,61 +116,19 @@ async fn linked(
         .collect::<Vec<String>>()
         .join(" ");
     if account_id == "" {
-        body += "Please supply an account ID or username!";
-
-        send_embed(
-            &ctx, 
-            &msg, 
-            title, 
-            &body, 
-            get_random_anime_girl()
-        ).await
-            .unwrap();
-
-        return;
+        return Err(String::from("Please supply an account ID or username!"));
     }
 
     // Ensure that input is an account ID
-    match 
-        ubisoft_api
-            .lock().await
-            .get_account_id(account_id.clone(), platform).await
-    {
-        Ok(id) => {
-            account_id = String::from(id);
-        }
-        Err(_) => {
-            body += &format!("Account **{account_id}** does not exist!");
-
-            send_embed(
-                &ctx, 
-                &msg, 
-                title, 
-                &body, 
-                "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
-            ).await
-                .unwrap();
-
-            return;
-        }
-    }
+    account_id = ubisoft_api
+        .lock().await
+        .get_account_id(account_id.clone(), platform).await
+        .map_err(|_| format!("Account **{account_id}** does not exist!"))?;
     
     // Ensure valid account ID
-    let profiles_option: Option<Vec<Value>> = get_profiles( ubisoft_api.clone(), &account_id )
-        .await;
-    if profiles_option.is_none() {
-        let _ = send_embed(
-            &ctx, 
-            &msg, 
-            title, 
-            "Account ID does not exist!", 
-            "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
-        ).await
-            .unwrap();
-        return;
-    }
-    let profiles = profiles_option
-        .expect("Unreachable");
+    let profiles: Vec<Value> = get_profiles( ubisoft_api.clone(), &account_id )
+        .await
+        .ok_or(format!("Account ID **{account_id}** does not exist!"))?;
     let mut usernames: HashSet<String> = HashSet::new();
     
     body += "## ⛓️ Linked Profiles\n";
@@ -191,29 +153,20 @@ async fn linked(
         &format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png"),
         false
     ).await;
+
+    Ok(())
 }
-async fn applications(
+async fn applications_helper(
     ubisoft_api: Arc<Mutex<Ubisoft>>,
     ctx: serenity::client::Context,
     msg: Message,
     args: VecDeque<String>
-) {
+) -> Result<(), String> {
     let mut body = String::new();
     let title = "OPSEC - Applications";
 
     if args.len() == 0 {
-        body += "Please supply an account ID or username!";
-
-        send_embed(
-            &ctx, 
-            &msg, 
-            title, 
-            &body, 
-            get_random_anime_girl()
-        ).await
-            .unwrap();
-
-        return;
+        return Err(String::from("Please supply an account ID or username!"));
     }
 
     // Ensure input argument
@@ -222,72 +175,28 @@ async fn applications(
         .collect::<Vec<String>>()
         .join(" ");
     if account_id == "" {
-        body += "Please supply an account ID or username!";
-
-        send_embed(
-            &ctx, 
-            &msg, 
-            title, 
-            &body, 
-            get_random_anime_girl()
-        ).await
-            .unwrap();
-
-        return;
+        return Err(String::from("Please supply an account ID or username!"));
     }
 
     // Ensure that input is an account ID
-    match 
-        ubisoft_api
-            .lock().await
-            .get_account_id(account_id.clone(), String::from("uplay")).await
-    {
-        Ok(id) => {
-            account_id = String::from(id);
-        }
-        Err(_) => {
-            body += &format!("Account **{account_id}** does not exist!");
-
-            send_embed(
-                &ctx, 
-                &msg, 
-                title, 
-                &body, 
-                "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
-            ).await
-                .unwrap();
-
-            return;
-        }
-    }
+    account_id =  ubisoft_api
+        .lock().await
+        .get_account_id(account_id.clone(), String::from("uplay")).await
+        .map_err(|_| format!("Account **{account_id}** does not exist!"))?;
 
     let res = ubisoft_api.lock().await
         .get_applications(account_id.clone()).await
         .expect("Failed to get applications!");
 
-    match serialize_applications_response( &res ) {
-        Ok(applications) => {
-            body += &format!("## 📱 Applications\n\n");
+    let applications = serialize_applications_response( &res )
+        .map_err(|err| format!("\nEncountered an error while fetching applications! \n{err}"))?;
+    
+    body += &format!("## 📱 Applications\n\n");
+    body += &applications;
 
-            body += &applications;
-        }
-        Err(err) => {
-            body += &format!("\nEncountered an error while fetching applications! \n{err}");
-
-            send_embed(
-                &ctx, 
-                &msg, 
-                title, 
-                &body, 
-                "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
-            ).await
-                .unwrap();
-        }
-    }
-
-    send_embed(
-        &ctx, 
-        &msg, 
+    send_embed_no_return(
+        ctx, 
+        msg, 
         title, 
         &body, 
         &format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png")
@@ -295,6 +204,8 @@ async fn applications(
         .unwrap();
 
     println!("Result: {res}");
+
+    Ok(())
 }
 fn serialize_applications_response (
     res: &Value
@@ -336,64 +247,105 @@ fn serialize_applications_response (
 
     Ok(body)
 }
-async fn help(
-    ctx: serenity::client::Context,
-    msg: Message
-) {
-    let _ = send_embed(
-        &ctx, 
-        &msg, 
-        "R6 - OPSEC - Help", 
-        "**Command List**:\n- `>>r6 opsec <pc | xbox | psn> <account name>`\n- `>>r6 opsec applications <pc uplay>`\n- `>>r6 opsec help`", 
-        "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
-    ).await
-        .expect("Failed to send embed!");
-}
-pub async fn opsec( 
-    ubisoft_api: Arc<Mutex<Ubisoft>>,
+pub async fn lookup_pc(
+    backend_handles: BackendHandles,
     ctx: serenity::client::Context,
     msg: Message,
-    mut args: VecDeque<String> 
+    args: VecDeque<String>
+) -> Result<(), String> {
+    tokio::spawn(linked( backend_handles.ubisoft_api, ctx, msg, args, String::from("uplay")));
+
+    Ok(())
+}
+pub async fn lookup_xbox(
+    backend_handles: BackendHandles,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String>
+) -> Result<(), String> {
+    tokio::spawn(linked( backend_handles.ubisoft_api, ctx, msg, args, String::from("xbl")));
+
+    Ok(())
+}
+pub async fn lookup_psn(
+    backend_handles: BackendHandles,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String>
+) -> Result<(), String> {
+    tokio::spawn(linked( backend_handles.ubisoft_api, ctx, msg, args, String::from("psn")));
+
+    Ok(())
+}
+pub async fn applications(
+    backend_handles: BackendHandles,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String>
+) -> Result<(), String> {
+    applications_helper( backend_handles.ubisoft_api, ctx, msg, args ).await
+}
+
+pub async fn build_opsec_commands() -> R6RSCommand {
+    let mut opsec_nest_command = R6RSCommand::new_root(
+        String::from("Commands for location information on Ubisoft Connect accounts.")
+    );
+    opsec_nest_command.attach(
+        String::from("pc"),
+        R6RSCommand::new_leaf(
+            String::from("Lookups up a Ubisoft account based on their registered PC username"),
+            AsyncFnPtr::new(lookup_pc),
+            vec!(vec!(String::from("username")))
+        )
+    );
+    opsec_nest_command.attach(
+        String::from("xbox"),
+        R6RSCommand::new_leaf(
+            String::from("Lookups up a Ubisoft account based on their registered Xbox username"),
+            AsyncFnPtr::new(lookup_xbox),
+            vec!(vec!(String::from("username")))
+        )
+    );
+    opsec_nest_command.attach(
+        String::from("psn"),
+        R6RSCommand::new_leaf(
+            String::from("Lookups up a Ubisoft account based on their registered PSN username"),
+            AsyncFnPtr::new(lookup_psn),
+            vec!(vec!(String::from("username")))
+        )
+    );
+    opsec_nest_command.attach(
+        String::from("applications"),
+        R6RSCommand::new_leaf(
+            String::from("Lookups up a Ubisoft account based on their username (PC only)"),
+            AsyncFnPtr::new(applications),
+            vec!(vec!(String::from("username")))
+        )
+    );
+
+    opsec_nest_command
+}
+pub async fn opsec( 
+    opsec_nest_command: Arc<Mutex<R6RSCommand>>,
+
+    backend_handles: BackendHandles,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String> 
 ) {
-    match args
-        .pop_front()
-        .unwrap_or(String::from("help"))
-        .as_str()
-    {
-        "pc" => {
-            tokio::spawn(linked( ubisoft_api, ctx, msg, args, String::from("uplay") ));
-        },
-        "xbox" => {
-            tokio::spawn(linked( ubisoft_api, ctx, msg, args, String::from("xbl") ));
-        },
-        "psn" => {
-            tokio::spawn(linked( ubisoft_api, ctx, msg, args, String::from("psn") ));
-        },
-        "applications" => {
-            tokio::spawn(applications( ubisoft_api, ctx, msg, args ));
-        }, 
-        "namefind" => {
-            send_embed(
-                &ctx, 
-                &msg, 
-                "Command depreciated", 
-                "Please instead use the following:\n`>>osint sherlock <username>`", 
-                "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
-            ).await
-                .unwrap();
-        },
-        "help" => {
-            tokio::spawn(help( ctx, msg ));
-        },
-        nonexistant => {
-            send_embed(
-                &ctx, 
-                &msg, 
-                "Command does not exist", 
-                &format!("The subcommand `{nonexistant}` is not valid!\n\nConfused?\nRun `>>r6 opsec help` for information on `opsec`'s commands\nRun `r6 help` for information on all commands"), 
-                "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4"
-            ).await
-                .unwrap();
-        }
+    if let Err(err) = opsec_nest_command.lock().await.call(
+        backend_handles,
+        ctx.clone(), 
+        msg.clone(), 
+        args
+    ).await {
+        println!("Failed! [{err}]");
+        send_embed(
+            &ctx, 
+            &msg, 
+            "OPSEC - Blacklist Error", 
+            &format!("Failed for reason:\n\n\"{err}\""), 
+            get_random_anime_girl()
+        ).await.unwrap();
     }
 }

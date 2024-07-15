@@ -536,7 +536,7 @@ pub async fn sherlock(
 pub async fn build_osint_commands() -> R6RSCommand {
 
     let mut osint_nest_command = R6RSCommand::new_root(
-        String::from("Admin commands, generally intended only for usage by the owner.")
+        String::from("Commands for gather Open Source Intelligence (OSINT). Please see the GitHub for Terms of Usage.")
     );
     // Create a nest for query-based commands
     let mut query_nest_command = R6RSCommand::new_root(String::from("Query-based commands for OSINT."));
