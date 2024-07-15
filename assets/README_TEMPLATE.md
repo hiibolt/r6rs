@@ -8,5 +8,5 @@ All sections can be placed behind a Discord User ID whitelist system, allowing s
 
 <!-- INJECT MARKER -->
 
-### Setup
+## Setup
 While open source, I do *not* provide setup instructions. If such a tool interests you, join the [Discord](https://discord.gg/ENGqjywsbm) for details on purchasing access!
