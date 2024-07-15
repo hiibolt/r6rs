@@ -16,7 +16,7 @@ use std::{
 };
 
 use apis::database::CommandEntry;
-use helper::{BackendHandles, R6RSCommand};
+use helper::{inject_documentation, BackendHandles, R6RSCommand};
 use tokio::sync::Mutex;
 use serde_json::Value;
 use serenity::{all::{ActivityData, ActivityType, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Interaction, OnlineStatus}, async_trait};
@@ -318,7 +318,7 @@ async fn main() -> Result<()> {
     let opsec_commands   = sections::opsec::build_opsec_commands().await;
     let mut root_command = R6RSCommand::new_root(
         String::from("R6RS is a general purpose bot, orignally intended for Rainbow Six Siege, but since multipurposed into a powerful general OSINT tool."),
-        String::from("Queries")
+        String::from("Commands")
     );
     let mut r6_root_command = R6RSCommand::new_root(
         String::from("Commands specifically related to R6."),
@@ -344,7 +344,11 @@ async fn main() -> Result<()> {
         String::from(">>osint"),
         osint_commands
     );
-    
+
+    // Write command documentation
+    inject_documentation(
+        &root_command.print_help(String::from(""), 2, true).await
+    ).await?;
 
     let backend_handles = BackendHandles {
         ubisoft_api,

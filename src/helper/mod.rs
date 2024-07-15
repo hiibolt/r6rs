@@ -16,7 +16,7 @@ use rand::prelude::SliceRandom;
 use anyhow::Result;
 use futures::future::{Future, BoxFuture};
 use std::collections::HashMap;
-use anyhow::{ anyhow, bail };
+use anyhow::{ anyhow, bail, Context };
 use async_recursion::async_recursion;
 use std::collections::VecDeque;
 
@@ -119,7 +119,8 @@ impl R6RSCommand {
     pub async fn print_help(
         &mut self,
         prefix: String,
-        level: usize
+        level: usize,
+        github_friendly: bool
     ) -> String {
         let mut body = String::from("\n");
 
@@ -138,7 +139,8 @@ impl R6RSCommand {
                     subsection_count += 1;
                     let nested_print = command.print_help(
                         prefix.clone() + " " + &name,
-                        level + 1
+                        level + 1,
+                        github_friendly
                     ).await;
                     
                     body += &nested_print;
@@ -164,6 +166,10 @@ impl R6RSCommand {
                     }
 
                     leaf_body += &format!("\n- {description}");
+
+                    if github_friendly {
+                        leaf_body += &format!("\n");
+                    }
                 }
                 _ => ()
             }
@@ -194,7 +200,7 @@ impl R6RSCommand {
                 if next_command == "help" || next_command == ">>help" {
                     let mut body = self.description.to_owned() + "\n";
                     
-                    body.push_str(&self.print_help(String::new(), 1).await);
+                    body.push_str(&self.print_help(String::new(), 1, false).await);
 
                     send_embed_no_return(
                         ctx, 
@@ -241,7 +247,31 @@ impl R6RSCommand {
     }
 }
 
+pub async fn inject_documentation(
+    body: &str
+) -> Result<()> {
+    // Load the documentation template from `assets/README_TEMPLATE.md`
+    let template = read_to_string("assets/README_TEMPLATE.md")
+        .context("Failed to read `assets/README_TEMPLATE.md`! Does the file exist?")?;
 
+    // Inject the body into the template
+    let inject_marker = "<!-- INJECT MARKER -->";
+    let injected = template.replace(inject_marker, body);
+
+    // Write the injected template to `README.md`
+    OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open("README.md")
+        .context("Failed to open file handle to `README.md`! Does the file exist?")?
+        .write_all(injected.as_bytes())
+        .context("Failed to write to `README.md`! Is the file in use?")?;
+
+    println!("[ Succesfully injected documentation! :3 ]");
+
+    Ok(())
+}
 pub async fn save( state: Arc<Mutex<State>> ) {
     let bot_data_serialized = &state
         .lock().await
@@ -257,7 +287,7 @@ pub async fn save( state: Arc<Mutex<State>> ) {
         .write_all(bot_data_serialized.as_bytes())
         .expect("Failed to write to `assets/bot_data.json`! Is the file in use?");
 
-    println!("[Succesfully saved! :3]");
+    println!("[ Succesfully saved! :3 ]");
 }
 pub async fn autosave( state: Arc<Mutex<State>> ) {
     loop {
@@ -268,7 +298,7 @@ pub async fn autosave( state: Arc<Mutex<State>> ) {
 }
 pub async fn autopull( state: Arc<Mutex<State>> ) {
     loop {
-        println!("[Pulled market data :3]");
+        println!("[ Pulled market data :3 ]");
 
         let market_data_contents: String = read_to_string("assets/data.json")
             .expect("Could not find 'assets/data.json', please ensure you have created one!");

@@ -6,8 +6,7 @@ A General Purpose Discord Bot for Tom Clancy's Rainbow Six Siege designed to imp
 
 All sections can be placed behind a Discord User ID whitelist system, allowing selective distribution via a key system.
 
-### Available Commands
-<!-- INJECT ME -->
+<!-- INJECT MARKER -->
 
 ### Setup
 While open source, I do *not* provide setup instructions. If such a tool interests you, join the [Discord](https://discord.gg/ENGqjywsbm) for details on purchasing access!
