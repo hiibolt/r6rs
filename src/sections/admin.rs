@@ -1,3 +1,4 @@
+use crate::apis::Ubisoft;
 use crate::helper::get_random_anime_girl;
 use crate::helper::send_embed_no_return;
 use crate::helper::AsyncFnPtr;
@@ -6,11 +7,14 @@ use crate::VecDeque;
 use crate::Message;
 use crate::send_embed;
 use crate::State;
-use crate::{ Arc, Mutex };
+use crate::Arc;
+use tokio::sync::Mutex;
 use crate::helper::save;
 
 
 pub async fn whitelist(
+    _ubisoft_api: Arc<Mutex<Ubisoft>>,
+
     state: Arc<Mutex<State>>,
     ctx: serenity::client::Context,
     msg: Message,
@@ -49,6 +53,8 @@ pub async fn whitelist(
     Ok(())
 }
 pub async fn blacklist(
+    _ubisoft_api: Arc<Mutex<Ubisoft>>,
+
     state: Arc<Mutex<State>>,
     ctx: serenity::client::Context,
     msg: Message,
@@ -96,14 +102,9 @@ pub async fn blacklist(
     Ok(())
 }
 
-pub async fn admin(
-    state: Arc<Mutex<State>>,
-    ctx: serenity::client::Context,
-    msg: Message,
-    args: VecDeque<String> 
-) {
+pub async fn build_admin_commands() -> R6RSCommand {
     let mut admin_nest_command = R6RSCommand::new_root(
-        String::from("Admin nest command")
+        String::from("Admin commands, generally intended only for usage by the owner.")
     );
     admin_nest_command.attach(
         String::from("blacklist"),
@@ -122,7 +123,26 @@ pub async fn admin(
         )
     );
 
-    if let Err(err) = admin_nest_command.call(state, ctx.clone(), msg.clone(), args).await {
+    admin_nest_command
+}
+pub async fn admin(
+    admin_nest_command: Arc<Mutex<R6RSCommand>>,
+
+    ubisoft_api: Arc<Mutex<Ubisoft>>,
+
+    state: Arc<Mutex<State>>,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String> 
+) {
+    if let Err(err) = admin_nest_command.lock().await.call(
+        ubisoft_api,
+
+        state, 
+        ctx.clone(), 
+        msg.clone(), 
+        args
+    ).await {
         println!("Failed! [{err}]");
         send_embed(
             &ctx, 

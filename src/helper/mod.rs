@@ -1,3 +1,4 @@
+use crate::apis::Ubisoft;
 use crate::Message;
 use crate::State;
 use crate::{ Arc, Mutex };
@@ -20,6 +21,7 @@ use std::collections::VecDeque;
 
 pub struct AsyncFnPtr<R> {
     func: Box<dyn Fn(
+        Arc<Mutex<Ubisoft>>,
         Arc<Mutex<State>>,
         serenity::client::Context,
         Message,
@@ -29,6 +31,7 @@ pub struct AsyncFnPtr<R> {
 impl <R> AsyncFnPtr<R> {
     pub fn new<F>(
         f: fn(
+            Arc<Mutex<Ubisoft>>,
             Arc<Mutex<State>>,
             serenity::client::Context,
             Message,
@@ -39,17 +42,19 @@ impl <R> AsyncFnPtr<R> {
         F: Future<Output = R> + Send + Sync + 'static
     {
         AsyncFnPtr {
-            func: Box::new(move |state, ctx, msg, args| Box::pin(f(state, ctx, msg, args))),
+            func: Box::new(move |ubisoft_api, state, ctx, msg, args| Box::pin(f(ubisoft_api, state, ctx, msg, args))),
         }
     }
     pub async fn run(
         &self,
+        ubisoft_api: Arc<Mutex<Ubisoft>>,
+
         state: Arc<Mutex<State>>,
         ctx: serenity::client::Context,
         msg: Message,
         args: VecDeque<String>
     ) -> R { 
-        (self.func)(state, ctx, msg, args).await
+        (self.func)(ubisoft_api, state, ctx, msg, args).await
     }
 }
 pub enum R6RSCommandType {
@@ -143,6 +148,8 @@ impl R6RSCommand {
     #[async_recursion]
     pub async fn call(
         &mut self,
+        ubisoft_api: Arc<Mutex<Ubisoft>>,
+
         state: Arc<Mutex<State>>,
         ctx: serenity::client::Context,
         msg: Message,
@@ -155,11 +162,13 @@ impl R6RSCommand {
                     .ok_or(anyhow!("Missing subcommand!"))?;
 
                 if next_command == "help" {
-                    let body = self.print_help().await
+                    let mut body = self.description.to_owned() + "\n";
+                    
+                    body.push_str(&self.print_help().await
                         .iter()
-                        .map(|line| format!("### `{}`\n{}", line.0, line.1))
+                        .map(|line| format!("\n**`{}`**\n{}", line.0, line.1))
                         .collect::<Vec<String>>()
-                        .join("\n");
+                        .join("\n"));
 
                     send_embed_no_return(
                         ctx, 
@@ -178,13 +187,13 @@ impl R6RSCommand {
 
                 commands.get_mut(&next_command)
                     .expect("Unreachable!")
-                    .call(state, ctx, msg, args).await?;
+                    .call(ubisoft_api, state, ctx, msg, args).await?;
 
                 println!("Root command!");
                 Ok(())
             },
             R6RSCommandType::LeafCommand((f, _)) => {
-                f.run(state, ctx, msg, args).await
+                f.run(ubisoft_api, state, ctx, msg, args).await
                     .map_err(|e| anyhow!("Encountered an error!\n\n{e:#?}"))
             }
         }

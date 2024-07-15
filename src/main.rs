@@ -17,6 +17,7 @@ use std::{
 };
 
 use apis::database::CommandEntry;
+use helper::R6RSCommand;
 use tokio::sync::Mutex;
 use serde_json::Value;
 use serenity::{all::{ActivityData, ActivityType, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Interaction, OnlineStatus}, async_trait};
@@ -27,15 +28,16 @@ use url::Url;
 use std::collections::HashMap;
 use anyhow::Result;
 
-#[derive(Debug)]
 struct State {
     bot_data: Value,
     id_list: HashMap<String, String>,
     market_data: Value
 }
 
-#[derive(Debug)]
 struct Bot {
+    admin_commands: Arc<Mutex<R6RSCommand>>,
+    econ_commands: Arc<Mutex<R6RSCommand>>,
+
     ubisoft_api: Arc<Mutex<Ubisoft>>,
     snusbase:    Arc<Mutex<Snusbase>>,
     bulkvs:      Arc<Mutex<BulkVS>>,
@@ -100,7 +102,7 @@ impl EventHandler for Bot {
                         }
 
                         // Otherwise, go ahead
-                        tokio::spawn(econ(self.state.clone(), self.ubisoft_api.clone(), ctx, msg, args));
+                        tokio::spawn(econ(self.econ_commands.clone(), self.state.clone(), self.ubisoft_api.clone(), ctx, msg, args));
                     },
                     "opsec" => {
                         // Check if they're not on the whitelist
@@ -132,7 +134,7 @@ impl EventHandler for Bot {
                         }
 
                         // Otherwise, go ahead
-                        tokio::spawn(admin( self.state.clone(), ctx, msg, args ));
+                        tokio::spawn(admin( self.admin_commands.clone(), self.ubisoft_api.clone(), self.state.clone(), ctx, msg, args ));
                     },
                     _ => { tokio::spawn(help(ctx, msg)); }
                 } 
@@ -378,10 +380,18 @@ async fn main() -> Result<()> {
     // Start autopull
     tokio::spawn(helper::autopull( state.clone() ));
 
+    let admin_commands = 
+        Arc::new(Mutex::new(sections::admin::build_admin_commands().await));
+    let econ_commands = 
+        Arc::new(Mutex::new(sections::econ::build_econ_commands().await));
+
     // Build client with state
     let mut client =
         Client::builder(&token, intents)
         .event_handler(Bot {
+            admin_commands,
+            econ_commands,
+
             snusbase,
             bulkvs,
             ubisoft_api,

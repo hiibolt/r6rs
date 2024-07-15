@@ -1,5 +1,5 @@
 use crate::apis::Ubisoft;
-use crate::helper::get_random_anime_girl;
+use crate::helper::{get_random_anime_girl, send_embed_no_return, AsyncFnPtr, R6RSCommand};
 use crate::Message;
 use serenity::all::{
     CreateMessage,
@@ -160,25 +160,41 @@ async fn data( state: Arc<Mutex<State>>, args: VecDeque<String> ) -> Result<(Str
 
     Ok((msg, format!("{item_name} ({item_type})"), item_asset_url.to_owned()))
 }
-async fn list( state: Arc<Mutex<State>>, mut args: VecDeque<String> ) -> String {
+async fn list(
+    _ubisoft_api: Arc<Mutex<Ubisoft>>,
+
+    state: Arc<Mutex<State>>,
+    ctx: serenity::client::Context,
+    msg: Message,
+    mut args: VecDeque<String>
+) -> Result<(), String> {
     // Get the page number
     let page: usize = args.pop_front()
         .and_then(|st| st.parse::<usize>().ok() )
         .unwrap_or(1);
 
-    let mut msg: String = format!("# Ask Bolt for new items.\n\n## Skins (Page {page}):\n(Run `r6 econ list {}` to see the next page)\n\n", page + 1);
+    let mut body: String = format!("# Ask Bolt for new items.\n\n## Skins (Page {page}):\n(Run `r6 econ list {}` to see the next page)\n\n", page + 1);
     
     for (key, _) in state.lock().await.id_list
         .iter()
         .skip( (page - 1) * 25 ) // Handle 'pages'
         .take( 25 )
     {
-        msg += &format!("{key}\n");
+        body += &format!("{key}\n");
     }
 
-    msg
+    send_embed_no_return(
+        ctx, 
+        msg, 
+        "Tracked Skins", 
+        &body, 
+        get_random_anime_girl()
+    ).await
+        .unwrap();
+
+    Ok(())
 }
-async fn graph(
+async fn graph_helper(
     state: Arc<Mutex<State>>,
     args: VecDeque<String>
 ) -> Result<String, String> {
@@ -266,7 +282,7 @@ async fn graph(
     
     Ok(item_id)
 }
-async fn profit( 
+async fn profit_helper( 
     state: Arc<Mutex<State>>,
     mut args: VecDeque<String> 
 ) -> Result<(String, String), String> {
@@ -332,25 +348,14 @@ async fn profit(
 
     Ok((msg, item_asset_url.to_owned()))
 }
-async fn help(
-    ctx: serenity::client::Context,
-    msg: Message
-) {
-    let _ = send_embed(
-        &ctx, 
-        &msg, 
-        "R6 - Economy - Help", 
-        "**Command List**:\n- `>>r6 econ analyze <item name | item id>`\n- `>>r6 econ graph <item name | item id>`\n- `>>r6 econ profit <purchased at> <item name | item id>`\n- `>>r6 econ list <(optional) page #>`\n- `>>r6 econ transfer <(optional) email> <(optional) password>`\n- `>>r6 econ help`", 
-        get_random_anime_girl()
-    ).await
-        .expect("Failed to send embed!");
-}
 pub async fn transfer (
     ubisoft_api: Arc<Mutex<Ubisoft>>,
+
+    _state: Arc<Mutex<State>>,
     ctx: serenity::client::Context,
     msg: Message,
     mut args: VecDeque<String> 
-) {
+) -> Result<(), String> {
     /* let number_of_items = args.pop_front()
         .unwrap_or(String::from("15"))
         .parse::<usize>()
@@ -367,32 +372,32 @@ pub async fn transfer (
             let temporary_ubisoft_api = Arc::new(Mutex::new(Ubisoft::new(email, password)));
 
             if let Err(err) = temporary_ubisoft_api.lock().await.login().await {
-                let _ = send_embed(
-                    &ctx, 
-                    &msg, 
+                send_embed_no_return(
+                    ctx, 
+                    msg, 
                     &format!("R6 - Economy - {} Least Sold Items", number_of_items), 
                     &format!("Failed to get items with an error! Please see below:\n\n{:#?}", err), 
                     get_random_anime_girl()
                 ).await
                     .expect("Failed to send embed!");
         
-                return;
+                return Ok(());
             }
 
             block_ubisoft_api = temporary_ubisoft_api;
 
             used_login = true;
         } else {
-            let _ = send_embed(
-                &ctx, 
-                &msg, 
+            send_embed_no_return(
+                ctx, 
+                msg, 
                 &format!("R6 - Economy - {} Least Sold Items", number_of_items), 
                 "You provided an email, but no password! Please provide both to use the login feature.", 
                 &get_random_anime_girl()
             ).await
                 .expect("Failed to send embed!");
 
-            return;
+            return Ok(());
         }
     }
 
@@ -407,16 +412,16 @@ pub async fn transfer (
     };
 
     if let Err(err) = items {
-        let _ = send_embed(
-            &ctx, 
-            &msg, 
+        send_embed_no_return(
+            ctx, 
+            msg, 
             &format!("R6 - Economy - {} Least Sold Items", number_of_items), 
             &format!("Failed to get items with an error! Please see below:\n\n{:#?}", err), 
             get_random_anime_girl()
         ).await
             .expect("Failed to send embed!");
 
-        return;
+        return Ok(());
     }
 
     let items = items.expect("Unreachable!");
@@ -442,131 +447,159 @@ pub async fn transfer (
         body.push_str("\n\nData is global, and gathered using an arbitrary Ubisoft account.");
     }
 
-    let _ = send_embed(
-        &ctx, 
-        &msg, 
+    send_embed_no_return(
+        ctx, 
+        msg, 
         &format!("R6 - Economy - {} Least Sold Items", number_of_items), 
         &body, 
         &items.get(0).expect("Unreachable?").asset_url
     ).await
         .expect("Failed to send embed!");
+
+    Ok(())
+}
+pub async fn analyze(
+    _ubisoft_api: Arc<Mutex<Ubisoft>>,
+
+    state: Arc<Mutex<State>>,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String>
+) -> Result<(), String> {
+    let (body, title, item_img) = data( state, args )
+        .await
+        .unwrap_or_else(|err| 
+            (err, String::from("Error!"), String::from(get_random_anime_girl()))
+        );
+    
+    send_embed_no_return(
+        ctx, 
+        msg, 
+        &title, 
+        &body, 
+        &item_img,
+    ).await
+        .map_err(|e| format!("{e:#?}"))
+}
+pub async fn graph(
+    _ubisoft_api: Arc<Mutex<Ubisoft>>,
+
+    state: Arc<Mutex<State>>,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String>
+) -> Result<(), String> {
+    let item_id = graph_helper( state, args )
+        .await?;
+
+    let attachment = CreateAttachment::path(&format!("assets/{item_id}.png"))
+            .await
+            .expect("Failed to create attachment!");
+
+    let embed = CreateEmbed::new()
+        .image(format!("attachment://{item_id}.png"));
+
+    let builder = CreateMessage::new()
+        .embed(embed)
+        .add_file(attachment);
+
+    tokio::spawn(msg.channel_id.send_message(ctx.http, builder));
+
+    Ok(())
+}
+pub async fn profit(
+    _ubisoft_api: Arc<Mutex<Ubisoft>>,
+
+    state: Arc<Mutex<State>>,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String>
+) -> Result<(), String> {
+    let (body, asset_url) = profit_helper( state, args ).await?;
+
+    send_embed_no_return(
+        ctx, 
+        msg, 
+        "Profit Analytics", 
+        &body, 
+        &asset_url
+    ).await
+        .expect("Failed to send embed!");
+    
+    Ok(())
+}
+
+pub async fn build_econ_commands() -> R6RSCommand {
+    let mut econ_nest_command = R6RSCommand::new_root(
+        String::from("Commands related to the Rainbow Six Siege Marketplace and its economy.")
+    );
+    econ_nest_command.attach(
+        String::from("list"),
+        R6RSCommand::new_leaf(
+            String::from("Lists all available skins."),
+            AsyncFnPtr::new(list),
+            vec!(vec!(), vec!(String::from("page #")))
+        )
+    );
+    econ_nest_command.attach(
+        String::from("analyze"),
+        R6RSCommand::new_leaf(
+            String::from("Creates a detailed data sheet on an item."),
+            AsyncFnPtr::new(analyze),
+            vec!(vec!(String::from("item name | item id")))
+        )
+    );
+    econ_nest_command.attach(
+        String::from("graph"),
+        R6RSCommand::new_leaf(
+            String::from("Graphs the all-time history of an item."),
+            AsyncFnPtr::new(graph),
+            vec!(vec!(String::from("item name | item id")))
+        )
+    );
+    econ_nest_command.attach(
+        String::from("profit"),
+        R6RSCommand::new_leaf(
+            String::from("Graphs the all-time history of an item."),
+            AsyncFnPtr::new(profit),
+            vec!(vec!(String::from("$ bought for"), String::from("item name | item id")))
+        )
+    );
+    econ_nest_command.attach(
+        String::from("transfer"),
+        R6RSCommand::new_leaf(
+            String::from("Finds the items with the least sellers either globally or on the account with the provided login."),
+            AsyncFnPtr::new(transfer),
+            vec!(vec!(), vec!(String::from("Ubisoft email"), String::from("Ubisoft password")))
+        )
+    );
+
+    econ_nest_command
 }
 pub async fn econ(
+    econ_nest_command: Arc<Mutex<R6RSCommand>>,
+
     state: Arc<Mutex<State>>,
     ubisoft_api: Arc<Mutex<Ubisoft>>,
     ctx: serenity::client::Context,
     msg: Message,
-    mut args: VecDeque<String>
+    args: VecDeque<String>
 ) {
-    match args
-        .pop_front()
-        .unwrap_or(String::from("help"))
-        .as_str()
-    {
-        "list" => {
-            let result: String = list( state, args ).await;
+    if let Err(err) = econ_nest_command.lock().await.call(
+        ubisoft_api,
 
-            send_embed(
-                &ctx, 
-                &msg, 
-                "Tracked Skins", 
-                &result, 
-                get_random_anime_girl()
-            ).await
-                .unwrap();
-        },
-        "analyze" => {
-            let (body, title, item_img) = data( state, args )
-                .await
-                .unwrap_or_else(|err| 
-                    (err, String::from("Error!"), String::from(get_random_anime_girl()))
-                );
-            
-            send_embed(
-                &ctx, 
-                &msg, 
-                &title, 
-                &body, 
-                &item_img,
-            ).await
-                .unwrap();
-        },
-        "graph" => {
-            match 
-                graph( state, args )
-                .await 
-            {
-                Ok(item_id) => {
-
-                    let attachment = CreateAttachment::path(&format!("assets/{item_id}.png"))
-                            .await
-                            .expect("Failed to create attachment!");
-
-                    let embed = CreateEmbed::new()
-                        .image(format!("attachment://{item_id}.png"));
-
-                    let builder = CreateMessage::new()
-                        .embed(embed)
-                        .add_file(attachment);
-
-                    msg.channel_id
-                        .send_message(&ctx.http, builder)
-                        .await
-                        .expect("Failed to send image embed! Probably a perms thing.");
-                },
-                Err(err_msg) => {
-                    send_embed(
-                        &ctx, 
-                        &msg, 
-                        "Error!", 
-                        &err_msg, 
-                        get_random_anime_girl()
-                    ).await
-                        .expect("Failed to send embed! Probably a perms thing.");
-                }
-            };
-        },
-        "profit" => {
-            match 
-                profit( state, args ).await
-            {
-                Ok((body, asset_url)) => {
-                    send_embed(
-                        &ctx, 
-                        &msg, 
-                        "Profit Analytics", 
-                        &body, 
-                        &asset_url
-                    ).await
-                        .expect("Failed to send embed!");
-                },
-                Err(err_msg) => {
-                    send_embed(
-                        &ctx, 
-                        &msg, 
-                        "Error!", 
-                        &err_msg, 
-                        get_random_anime_girl()
-                    ).await
-                        .expect("Failed to send embed!");
-                }
-            };
-        },
-        "transfer" => {
-            tokio::spawn(transfer( ubisoft_api.clone(), ctx, msg, args ));
-        }
-        "help" => {
-            tokio::spawn(help( ctx, msg ));
-        },
-        nonexistant => {
-            send_embed(
-                &ctx, 
-                &msg, 
-                "Command does not exist", 
-                &format!("The subcommand `{nonexistant}` is not valid!\n\nConfused?\nRun `>>r6 econ help` for information on `econ`'s commands\nRun `r6 help` for information on all commands"), 
-                get_random_anime_girl()
-            ).await
-                .unwrap();
-        }
+        state, 
+        ctx.clone(), 
+        msg.clone(), 
+        args
+    ).await {
+        println!("Failed! [{err}]");
+        send_embed(
+            &ctx, 
+            &msg, 
+            "Admin - Blacklist Error", 
+            &format!("Failed for reason:\n\n\"{err}\""), 
+            get_random_anime_girl()
+        ).await.unwrap();
     }
 }
