@@ -17,7 +17,7 @@ use std::{
 };
 
 use apis::database::CommandEntry;
-use helper::R6RSCommand;
+use helper::{BackendHandles, R6RSCommand};
 use tokio::sync::Mutex;
 use serde_json::Value;
 use serenity::{all::{ActivityData, ActivityType, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Interaction, OnlineStatus}, async_trait};
@@ -37,12 +37,9 @@ struct State {
 struct Bot {
     admin_commands: Arc<Mutex<R6RSCommand>>,
     econ_commands: Arc<Mutex<R6RSCommand>>,
+    osint_commands: Arc<Mutex<R6RSCommand>>,
 
-    ubisoft_api: Arc<Mutex<Ubisoft>>,
-    snusbase:    Arc<Mutex<Snusbase>>,
-    bulkvs:      Arc<Mutex<BulkVS>>,
-    state:       Arc<Mutex<State>>,
-    database:    Arc<Mutex<Database>>
+    backend_handles: BackendHandles
 }
 
 #[async_trait]
@@ -70,7 +67,7 @@ impl EventHandler for Bot {
         }
 
 
-        if let Err(e) = self.database
+        if let Err(e) = self.backend_handles.database
             .lock().await
             .upload_command(CommandEntry { 
                 message_id,
@@ -90,7 +87,7 @@ impl EventHandler for Bot {
                 {
                     "econ" => {
                         // Check if they're not on the whitelist
-                        if !self.state
+                        if !self.backend_handles.state
                             .lock().await
                             .bot_data["whitelisted_user_ids"]["econ"]
                             .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!")
@@ -102,11 +99,11 @@ impl EventHandler for Bot {
                         }
 
                         // Otherwise, go ahead
-                        tokio::spawn(econ(self.econ_commands.clone(), self.state.clone(), self.ubisoft_api.clone(), ctx, msg, args));
+                        tokio::spawn(econ(self.econ_commands.clone(), self.backend_handles.clone(), ctx, msg, args));
                     },
                     "opsec" => {
                         // Check if they're not on the whitelist
-                        if !self.state
+                        if !self.backend_handles.state
                             .lock().await
                             .bot_data["whitelisted_user_ids"]["opsec"]
                             .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!")
@@ -118,11 +115,11 @@ impl EventHandler for Bot {
                         }
 
                         // Otherwise, go ahead
-                        tokio::spawn(opsec(self.ubisoft_api.clone(), ctx, msg, args)); 
+                        tokio::spawn(opsec(self.backend_handles.ubisoft_api.clone(), ctx, msg, args)); 
                     },
                     "admin" => {
                         // Check if they're not on the whitelist
-                        if !self.state
+                        if !self.backend_handles.state
                             .lock().await
                             .bot_data["whitelisted_user_ids"]["admin"]
                             .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!")
@@ -134,14 +131,14 @@ impl EventHandler for Bot {
                         }
 
                         // Otherwise, go ahead
-                        tokio::spawn(admin( self.admin_commands.clone(), self.ubisoft_api.clone(), self.state.clone(), ctx, msg, args ));
+                        tokio::spawn(admin( self.admin_commands.clone(), self.backend_handles.clone(), ctx, msg, args ));
                     },
                     _ => { tokio::spawn(help(ctx, msg)); }
                 } 
             },
             "osint" => {
                 // Check if they're not on the whitelist
-                if !self.state
+                if !self.backend_handles.state
                     .lock().await
                     .bot_data["whitelisted_user_ids"]["osint"]
                     .as_array().expect("The user id whitelists must be lists, even if it's 0-1 users!")
@@ -153,7 +150,7 @@ impl EventHandler for Bot {
                 }
 
                 // Otherwise, go ahead
-                tokio::spawn(osint(self.snusbase.clone(), self.bulkvs.clone(), ctx, msg, args)); 
+                tokio::spawn(osint(self.osint_commands.clone(), self.backend_handles.clone(), ctx, msg, args)); 
             }
             _ => { tokio::spawn(help(ctx, msg)); }
         }
@@ -172,7 +169,7 @@ impl EventHandler for Bot {
                     let response = commands::announce_all::run(
                             command.data.options(), 
                             &ctx, 
-                            self.state.clone()
+                            self.backend_handles.state.clone()
                         ).await.expect("Failed to run command!");
                 
                     Some(response)
@@ -181,7 +178,7 @@ impl EventHandler for Bot {
                     let response = commands::announce_opsec::run(
                             command.data.options(), 
                             &ctx, 
-                            self.state.clone()
+                            self.backend_handles.state.clone()
                         ).await.expect("Failed to run command!");
                 
                     Some(response)
@@ -190,7 +187,7 @@ impl EventHandler for Bot {
                     let response = commands::announce_econ::run(
                             command.data.options(), 
                             &ctx, 
-                            self.state.clone()
+                            self.backend_handles.state.clone()
                         ).await.expect("Failed to run command!");
                 
                     Some(response)
@@ -199,7 +196,7 @@ impl EventHandler for Bot {
                     let response = commands::announce_osint::run(
                             command.data.options(), 
                             &ctx, 
-                            self.state.clone()
+                            self.backend_handles.state.clone()
                         ).await.expect("Failed to run command!");
                 
                     Some(response)
@@ -208,7 +205,7 @@ impl EventHandler for Bot {
                     let response = commands::development::run(
                             command.data.options(), 
                             &ctx, 
-                            self.ubisoft_api.clone()
+                            self.backend_handles.ubisoft_api.clone()
                         ).await.expect("Failed to run command!");
                 
                     Some(response)
@@ -384,6 +381,16 @@ async fn main() -> Result<()> {
         Arc::new(Mutex::new(sections::admin::build_admin_commands().await));
     let econ_commands = 
         Arc::new(Mutex::new(sections::econ::build_econ_commands().await));
+    let osint_commands =
+        Arc::new(Mutex::new(sections::osint::build_osint_commands().await));
+
+    let backend_handles = BackendHandles {
+        ubisoft_api,
+        snusbase,
+        bulkvs,
+        database,
+        state
+    };
 
     // Build client with state
     let mut client =
@@ -391,12 +398,9 @@ async fn main() -> Result<()> {
         .event_handler(Bot {
             admin_commands,
             econ_commands,
+            osint_commands,
 
-            snusbase,
-            bulkvs,
-            ubisoft_api,
-            state,
-            database
+            backend_handles
         })
         .activity(ActivityData {
             name: String::from("serverspace"),

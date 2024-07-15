@@ -1,21 +1,18 @@
-use crate::apis::Ubisoft;
 use crate::helper::get_random_anime_girl;
 use crate::helper::send_embed_no_return;
 use crate::helper::AsyncFnPtr;
+use crate::helper::BackendHandles;
 use crate::helper::R6RSCommand;
 use crate::VecDeque;
 use crate::Message;
 use crate::send_embed;
-use crate::State;
 use crate::Arc;
 use tokio::sync::Mutex;
 use crate::helper::save;
 
 
 pub async fn whitelist(
-    _ubisoft_api: Arc<Mutex<Ubisoft>>,
-
-    state: Arc<Mutex<State>>,
+    backend_handles: BackendHandles,
     ctx: serenity::client::Context,
     msg: Message,
     mut args: VecDeque<String>
@@ -31,7 +28,7 @@ pub async fn whitelist(
         .map_err(|_| String::from("Suppiled Discord User ID ust be an integer!"))?;
 
     // Update the entry
-    state.lock().await
+    backend_handles.state.lock().await
         .bot_data
         .get_mut("whitelisted_user_ids").ok_or(String::from("Missing whitelisted IDs JSON value!"))?
         .get_mut(section).ok_or(format!("Missing that section's JSON value!"))?
@@ -39,7 +36,7 @@ pub async fn whitelist(
         .push(user_id.into());
     
     // Save
-    save( state ).await;
+    save( backend_handles.state ).await;
 
     send_embed_no_return(
         ctx, 
@@ -53,9 +50,7 @@ pub async fn whitelist(
     Ok(())
 }
 pub async fn blacklist(
-    _ubisoft_api: Arc<Mutex<Ubisoft>>,
-
-    state: Arc<Mutex<State>>,
+    backend_handles: BackendHandles,
     ctx: serenity::client::Context,
     msg: Message,
     mut args: VecDeque<String>
@@ -71,7 +66,7 @@ pub async fn blacklist(
         .map_err(|_| String::from("Suppiled Discord User ID ust be an integer!"))?;
 
     // Update the entry
-    let removed_user = state.lock().await
+    let removed_user = backend_handles.state.lock().await
         .bot_data
         .get_mut("whitelisted_user_ids").ok_or(String::from("Missing whitelisted IDs JSON value!"))?
         .get_mut(section.clone()).ok_or(format!("Missing that section's JSON value!"))?
@@ -80,7 +75,7 @@ pub async fn blacklist(
         .filter(|&val| val.as_i64().expect("Unreachable") != user_id)
         .map(|val| val.clone())
         .collect();
-    (*state.lock().await
+    (*backend_handles.state.lock().await
         .bot_data
         .get_mut("whitelisted_user_ids").ok_or(String::from("Missing whitelisted IDs JSON value!"))?
         .get_mut(section).ok_or(format!("Missing that section's JSON value!"))?
@@ -88,7 +83,7 @@ pub async fn blacklist(
         = removed_user;
 
     // Save
-    save( state ).await;
+    save( backend_handles.state ).await;
 
     println!("Admin - Blacklist Success!");
     send_embed_no_return(
@@ -128,17 +123,13 @@ pub async fn build_admin_commands() -> R6RSCommand {
 pub async fn admin(
     admin_nest_command: Arc<Mutex<R6RSCommand>>,
 
-    ubisoft_api: Arc<Mutex<Ubisoft>>,
-
-    state: Arc<Mutex<State>>,
+    backend_handles: BackendHandles,
     ctx: serenity::client::Context,
     msg: Message,
     args: VecDeque<String> 
 ) {
     if let Err(err) = admin_nest_command.lock().await.call(
-        ubisoft_api,
-
-        state, 
+        backend_handles,
         ctx.clone(), 
         msg.clone(), 
         args

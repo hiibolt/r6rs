@@ -1,5 +1,5 @@
 use crate::apis::Ubisoft;
-use crate::helper::{get_random_anime_girl, send_embed_no_return, AsyncFnPtr, R6RSCommand};
+use crate::helper::{get_random_anime_girl, send_embed_no_return, AsyncFnPtr, BackendHandles, R6RSCommand};
 use crate::Message;
 use serenity::all::{
     CreateMessage,
@@ -161,9 +161,7 @@ async fn data( state: Arc<Mutex<State>>, args: VecDeque<String> ) -> Result<(Str
     Ok((msg, format!("{item_name} ({item_type})"), item_asset_url.to_owned()))
 }
 async fn list(
-    _ubisoft_api: Arc<Mutex<Ubisoft>>,
-
-    state: Arc<Mutex<State>>,
+    backend_handles: BackendHandles,
     ctx: serenity::client::Context,
     msg: Message,
     mut args: VecDeque<String>
@@ -175,7 +173,7 @@ async fn list(
 
     let mut body: String = format!("# Ask Bolt for new items.\n\n## Skins (Page {page}):\n(Run `r6 econ list {}` to see the next page)\n\n", page + 1);
     
-    for (key, _) in state.lock().await.id_list
+    for (key, _) in backend_handles.state.lock().await.id_list
         .iter()
         .skip( (page - 1) * 25 ) // Handle 'pages'
         .take( 25 )
@@ -349,9 +347,7 @@ async fn profit_helper(
     Ok((msg, item_asset_url.to_owned()))
 }
 pub async fn transfer (
-    ubisoft_api: Arc<Mutex<Ubisoft>>,
-
-    _state: Arc<Mutex<State>>,
+    backend_handles: BackendHandles,
     ctx: serenity::client::Context,
     msg: Message,
     mut args: VecDeque<String> 
@@ -363,7 +359,7 @@ pub async fn transfer (
         .min(15); */
     let number_of_items = 15;
 
-    let mut block_ubisoft_api = ubisoft_api.clone();
+    let mut block_ubisoft_api = backend_handles.ubisoft_api.clone();
     let mut used_login = false;
     if let Some(email) = args.pop_front() {
         if let Some(password) = args.pop_front() {
@@ -459,14 +455,12 @@ pub async fn transfer (
     Ok(())
 }
 pub async fn analyze(
-    _ubisoft_api: Arc<Mutex<Ubisoft>>,
-
-    state: Arc<Mutex<State>>,
+    backend_handles: BackendHandles,
     ctx: serenity::client::Context,
     msg: Message,
     args: VecDeque<String>
 ) -> Result<(), String> {
-    let (body, title, item_img) = data( state, args )
+    let (body, title, item_img) = data( backend_handles.state, args )
         .await
         .unwrap_or_else(|err| 
             (err, String::from("Error!"), String::from(get_random_anime_girl()))
@@ -482,14 +476,12 @@ pub async fn analyze(
         .map_err(|e| format!("{e:#?}"))
 }
 pub async fn graph(
-    _ubisoft_api: Arc<Mutex<Ubisoft>>,
-
-    state: Arc<Mutex<State>>,
+    backend_handles: BackendHandles,
     ctx: serenity::client::Context,
     msg: Message,
     args: VecDeque<String>
 ) -> Result<(), String> {
-    let item_id = graph_helper( state, args )
+    let item_id = graph_helper( backend_handles.state, args )
         .await?;
 
     let attachment = CreateAttachment::path(&format!("assets/{item_id}.png"))
@@ -508,14 +500,12 @@ pub async fn graph(
     Ok(())
 }
 pub async fn profit(
-    _ubisoft_api: Arc<Mutex<Ubisoft>>,
-
-    state: Arc<Mutex<State>>,
+    backend_handles: BackendHandles,
     ctx: serenity::client::Context,
     msg: Message,
     args: VecDeque<String>
 ) -> Result<(), String> {
-    let (body, asset_url) = profit_helper( state, args ).await?;
+    let (body, asset_url) = profit_helper( backend_handles.state, args ).await?;
 
     send_embed_no_return(
         ctx, 
@@ -579,16 +569,13 @@ pub async fn build_econ_commands() -> R6RSCommand {
 pub async fn econ(
     econ_nest_command: Arc<Mutex<R6RSCommand>>,
 
-    state: Arc<Mutex<State>>,
-    ubisoft_api: Arc<Mutex<Ubisoft>>,
+    backend_handles: BackendHandles,
     ctx: serenity::client::Context,
     msg: Message,
     args: VecDeque<String>
 ) {
     if let Err(err) = econ_nest_command.lock().await.call(
-        ubisoft_api,
-
-        state, 
+        backend_handles,
         ctx.clone(), 
         msg.clone(), 
         args

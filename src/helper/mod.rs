@@ -1,3 +1,6 @@
+use crate::apis::BulkVS;
+use crate::apis::Database;
+use crate::apis::Snusbase;
 use crate::apis::Ubisoft;
 use crate::Message;
 use crate::State;
@@ -17,12 +20,17 @@ use anyhow::{ anyhow, bail };
 use async_recursion::async_recursion;
 use std::collections::VecDeque;
 
-
-
+#[derive(Clone)]
+pub struct BackendHandles {
+    pub ubisoft_api: Arc<Mutex<Ubisoft>>,
+    pub snusbase:    Arc<Mutex<Snusbase>>,
+    pub bulkvs:      Arc<Mutex<BulkVS>>,
+    pub state:       Arc<Mutex<State>>,
+    pub database:    Arc<Mutex<Database>>
+}
 pub struct AsyncFnPtr<R> {
     func: Box<dyn Fn(
-        Arc<Mutex<Ubisoft>>,
-        Arc<Mutex<State>>,
+        BackendHandles,
         serenity::client::Context,
         Message,
         VecDeque<String>
@@ -31,8 +39,7 @@ pub struct AsyncFnPtr<R> {
 impl <R> AsyncFnPtr<R> {
     pub fn new<F>(
         f: fn(
-            Arc<Mutex<Ubisoft>>,
-            Arc<Mutex<State>>,
+            BackendHandles,
             serenity::client::Context,
             Message,
             VecDeque<String>
@@ -42,19 +49,17 @@ impl <R> AsyncFnPtr<R> {
         F: Future<Output = R> + Send + Sync + 'static
     {
         AsyncFnPtr {
-            func: Box::new(move |ubisoft_api, state, ctx, msg, args| Box::pin(f(ubisoft_api, state, ctx, msg, args))),
+            func: Box::new(move |backend_handles, ctx, msg, args| Box::pin(f(backend_handles, ctx, msg, args))),
         }
     }
     pub async fn run(
         &self,
-        ubisoft_api: Arc<Mutex<Ubisoft>>,
-
-        state: Arc<Mutex<State>>,
+        backend_handles: BackendHandles,
         ctx: serenity::client::Context,
         msg: Message,
         args: VecDeque<String>
     ) -> R { 
-        (self.func)(ubisoft_api, state, ctx, msg, args).await
+        (self.func)(backend_handles, ctx, msg, args).await
     }
 }
 pub enum R6RSCommandType {
@@ -148,9 +153,7 @@ impl R6RSCommand {
     #[async_recursion]
     pub async fn call(
         &mut self,
-        ubisoft_api: Arc<Mutex<Ubisoft>>,
-
-        state: Arc<Mutex<State>>,
+        backend_handles: BackendHandles,
         ctx: serenity::client::Context,
         msg: Message,
         mut args: VecDeque<String>
@@ -187,13 +190,13 @@ impl R6RSCommand {
 
                 commands.get_mut(&next_command)
                     .expect("Unreachable!")
-                    .call(ubisoft_api, state, ctx, msg, args).await?;
+                    .call(backend_handles, ctx, msg, args).await?;
 
                 println!("Root command!");
                 Ok(())
             },
             R6RSCommandType::LeafCommand((f, _)) => {
-                f.run(ubisoft_api, state, ctx, msg, args).await
+                f.run(backend_handles, ctx, msg, args).await
                     .map_err(|e| anyhow!("Encountered an error!\n\n{e:#?}"))
             }
         }

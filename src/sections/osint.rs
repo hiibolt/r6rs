@@ -1,6 +1,5 @@
-use crate::apis::is_valid_sherlock_username;
-use crate::apis::{ snusbase::Snusbase, bulkvs::BulkVS };
-use crate::helper::{ edit_embed, get_random_anime_girl, send_embed };
+use crate::apis::{is_valid_sherlock_username, Snusbase};
+use crate::helper::{ edit_embed, get_random_anime_girl, send_embed, send_embed_no_return, AsyncFnPtr, BackendHandles, R6RSCommand };
 
 use serenity::all::{CreateAttachment, CreateMessage, Message};
 use tokio::sync::Mutex;
@@ -15,7 +14,7 @@ pub async fn lookup(
     msg: Message,
     mut args: VecDeque<String>,
     lookup_type: &str
-) {
+) -> Result<(), String> {
     let snusbase_response_result = match lookup_type {
         "email" => {
             let mut ret = Err(anyhow::anyhow!("No email provided!"));
@@ -93,16 +92,7 @@ pub async fn lookup(
     };
 
     if snusbase_response_result.is_err() {
-        send_embed(
-            &ctx, 
-            &msg, 
-            "An error occured", 
-            &format!("{}", snusbase_response_result.unwrap_err()), 
-            get_random_anime_girl()
-        ).await
-            .unwrap();
-
-        return;
+        return Err(format!("{}", snusbase_response_result.unwrap_err()));
     }
 
     let snusbase_response = snusbase_response_result.expect("unreachable");
@@ -117,9 +107,9 @@ pub async fn lookup(
     if number_of_entries > 10 {
         let full_dump = format!("{}", snusbase_response);
 
-        send_embed(
-            &ctx, 
-            &msg, 
+        send_embed_no_return(
+            ctx.clone(), 
+            msg.clone(), 
             "OSINT DUMP", 
             "There were more than 10 results, which in total contains more data than Discord can display.\n\nA full dump will be attached below shortly!", 
             get_random_anime_girl()
@@ -128,30 +118,29 @@ pub async fn lookup(
 
         let builder = CreateMessage::new();
 
-        msg.channel_id.send_files(
-            &ctx.http,
+        tokio::spawn(msg.channel_id.send_files(
+            ctx.http,
             std::iter::once(CreateAttachment::bytes(
                 full_dump.as_bytes(),
                 "full_dump.txt"
             )),
             builder
-        ).await
-            .unwrap();
+        ));
 
-        return;
+        return Ok(());
     }
 
     if snusbase_response.results.len() == 0 {
-        send_embed(
-            &ctx, 
-            &msg, 
+        send_embed_no_return(
+            ctx.clone(), 
+            msg.clone(), 
             "No results", 
             "Nothing was found for the given query!\n\n*There were no errors, but there weren't any results either.*", 
             get_random_anime_girl()
             ).await
                 .unwrap();
         
-        return;
+        return Ok(());
     }
 
     let number_of_sources = snusbase_response.results.len();
@@ -171,9 +160,9 @@ pub async fn lookup(
             
             message += &format!("\n(From `{}`):\n", dump);
 
-            send_embed(
-                &ctx, 
-                &msg, 
+            send_embed_no_return(
+                ctx.clone(), 
+                msg.clone(), 
                 "OSINT DUMP - Via Email", 
                 &message, 
                 get_random_anime_girl()
@@ -181,459 +170,509 @@ pub async fn lookup(
                 .unwrap();
         }
     }
+
+    Ok(())
 }
-pub async fn help (
+
+pub async fn query_email(
+    backend_handles: BackendHandles,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String>
+) -> Result<(), String> {
+    lookup(backend_handles.snusbase, ctx, msg, args, "email").await
+}
+pub async fn query_username(
+    backend_handles: BackendHandles,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String>
+) -> Result<(), String> {
+    lookup(backend_handles.snusbase, ctx, msg, args, "username").await
+}
+pub async fn query_last_ip(
+    backend_handles: BackendHandles,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String>
+) -> Result<(), String> {
+    lookup(backend_handles.snusbase, ctx, msg, args, "last_ip").await
+}
+pub async fn query_hash(
+    backend_handles: BackendHandles,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String>
+) -> Result<(), String> {
+    lookup(backend_handles.snusbase, ctx, msg, args, "hash").await
+}
+pub async fn query_password(
+    backend_handles: BackendHandles,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String>
+) -> Result<(), String> {
+    lookup(backend_handles.snusbase, ctx, msg, args, "password").await
+}
+pub async fn query_name(
+    backend_handles: BackendHandles,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String>
+) -> Result<(), String> {
+    lookup(backend_handles.snusbase, ctx, msg, args, "name").await
+}
+pub async fn cnam_lookup(
+    backend_handles: BackendHandles,
+    ctx: serenity::client::Context,
+    msg: Message,
+    mut args: VecDeque<String>
+) -> Result<(), String> {
+    let phone_number = args.pop_front()
+        .ok_or(String::from("Missing phone number!"))?;
+
+    let response = backend_handles.bulkvs.lock()
+        .await
+        .query_phone_number(&phone_number)
+        .map_err(|e| format!("{e:#?}"))?;
+
+    let mut message = String::new();
+    if let Some(name) = response.name {
+        message += &format!("\n- **Name**: {name}");
+    }
+    if let Some(number) = response.number {
+        message += &format!("\n- **Number**: {number}");
+    }
+    if let Some(time) = response.time {
+        message += &format!("\n- **Time**: {time}");
+    }
+
+    send_embed_no_return(
+        ctx, 
+        msg, 
+        "CNAM Lookup", 
+        &message, 
+        get_random_anime_girl()
+    ).await
+        .unwrap();
+
+    Ok(())
+}
+async fn geolocate(
+    backend_handles: BackendHandles,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String>
+) -> Result<(), String> {
+    let response = backend_handles.snusbase.lock()
+        .await
+        .whois_ip_query(args.into_iter().collect())
+        .await
+        .map_err(|e| format!("{e:#?}"))?;
+
+
+    let mut message = String::new();
+    for (ip, content) in &response.results {
+        message += &format!("## IP (*{}*):\n", ip);
+
+        for (key, value) in content {
+            if value.is_string() {
+                message += &format!("\n- **{}**: {:?}", key, value.as_str().unwrap());
+            } else if value.is_number() {
+                message += &format!("\n- **{}**: {:?}", key, value.as_number().unwrap());
+            } else {
+                message += &format!("\n- **{}**: {:?}", key, value);
+            }
+        }
+    }
+
+    send_embed_no_return(
+        ctx, 
+        msg, 
+        "IP Lookup", 
+        &message, 
+        get_random_anime_girl()
+    ).await
+        .unwrap();
+
+    Ok(())
+}
+pub async fn dehash(
+    backend_handles: BackendHandles,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String>
+) -> Result<(), String> {
+    let response = backend_handles.snusbase.lock()
+        .await
+        .dehash(args.into_iter().collect())
+        .await
+        .map_err(|e| format!("{e:#?}"))?;
+
+    let mut body = String::new();
+    let number_of_dumps = response.results.len();
+    let mut total_results = 0;
+
+    for (dump_ind, ( dump_name, content)) in response.results.iter().enumerate() {
+        body += &format!("## Dump {}/{}:\n*(From `{}`)*\n", dump_ind + 1, number_of_dumps, dump_name);
+
+        let number_of_results_in_dump = content.len();
+        for (result_ind, value) in content.iter().enumerate() {
+            total_results += 1;
+
+            for (key, value) in value.as_object().expect("Didn't get an object back from backend?") {
+                body += &format!("\nResult {}/{}:\n- **{}**: {}\n", result_ind + 1, number_of_results_in_dump, key, value);
+            }
+        }
+    }
+
+    if total_results > 20 {
+        send_embed_no_return(
+            ctx.clone(), 
+            msg.clone(), 
+            "OSINT DUMP - `dehash`", 
+            "There were more than 20 results, which in total contains more data than Discord can display.\n\nA full dump will be attached below shortly!", 
+            get_random_anime_girl()
+        ).await
+            .unwrap();
+
+        let builder = CreateMessage::new();
+
+        tokio::spawn(msg.channel_id.send_files(
+            ctx.http,
+            std::iter::once(CreateAttachment::bytes(
+                body.as_bytes(),
+                "full_dump.txt"
+            )),
+            builder
+        ));
+
+        return Ok(());
+    } else if total_results == 0 {
+        send_embed_no_return(
+            ctx, 
+            msg, 
+            "No results", 
+            "There were no errors, but there were also no results!",
+            get_random_anime_girl()
+        ).await.expect("Failed to send message!");
+
+        return Ok(());
+    }
+
+    send_embed_no_return(
+        ctx, 
+        msg, 
+        "Dehash Results", 
+        &body,
+        get_random_anime_girl()
+    ).await.expect("Failed to send message!");
+
+    Ok(())
+}
+pub async fn rehash(
+    backend_handles: BackendHandles,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String>
+) -> Result<(), String> {
+    let response = backend_handles.snusbase.lock()
+        .await
+        .rehash(args.into_iter().collect())
+        .await
+        .map_err(|e| format!("{e:#?}"));
+
+    let mut body = String::new();
+    let response = response.unwrap();
+    let number_of_dumps = response.results.len();
+    let mut total_results = 0;
+
+    for (dump_ind, ( dump_name, content)) in response.results.iter().enumerate() {
+        body += &format!("## Dump {}/{}:\n*(From `{}`)*\n", dump_ind + 1, number_of_dumps, dump_name);
+
+        let number_of_results_in_dump = content.len();
+        for (result_ind, value) in content.iter().enumerate() {
+            total_results += 1;
+
+            for (key, value) in value.as_object().expect("Didn't get an object back from backend?") {
+                body += &format!("\nResult {}/{}:\n- **{}**: {}\n", result_ind + 1, number_of_results_in_dump, key, value);
+            }
+        }
+    }
+
+    if total_results > 20 {
+        send_embed_no_return(
+            ctx.clone(), 
+            msg.clone(), 
+            "OSINT DUMP - `rehash`", 
+            "There were more than 20 results, which in total contains more data than Discord can display.\n\nA full dump will be attached below shortly!", 
+            get_random_anime_girl()
+        ).await
+            .unwrap();
+
+        let builder = CreateMessage::new();
+
+        tokio::spawn(msg.channel_id.send_files(
+            ctx.http,
+            std::iter::once(CreateAttachment::bytes(
+                body.as_bytes(),
+                "full_dump.txt"
+            )),
+            builder
+        ));
+
+        return Ok(());
+    } else if total_results == 0 {
+        send_embed_no_return(
+            ctx, 
+            msg, 
+            "No results", 
+            "There were no errors, but there were also no results!",
+            get_random_anime_girl()
+        ).await.expect("Failed to send message!");
+
+        return Ok(());
+    }
+
+    send_embed_no_return(
+        ctx, 
+        msg, 
+        "Dehash Results", 
+        &body,
+        get_random_anime_girl()
+    ).await.expect("Failed to send message!");
+
+    Ok(())
+}
+pub async fn sherlock_helper(
+    username: String,
+    
     ctx: serenity::client::Context,
     msg: Message
 ) {
-    send_embed(
-        &ctx, 
-        &msg, 
-        "OSINT Help", 
-        concat!("The `osint` command is used to query for information on emails, usernames, IPs, passwords and names.\n\n",
-        "## Subcommands:\n",
-        "### Personal Information\n",
-        "- `email` - Query database leaks by email\n", 
-        "- `username` - Query database leaks by username\n", 
-        "- `name` - Query database leaks by name\n",
-        "### Passwords\n",
-        "- `password` - Query database leaks by password\n",
-        "- `hash` - Query database leaks by hash\n",
-        "- `dehash` - Dehash a hash into pre-cracked passwords\n",
-        "- `rehash` - Rehash a password into pre-hashed hashes\n",
-        "### IP and Cellular\n",
-        "- `ip` - Geolocate by IP\n",
-        "- `last_ip` Query database leaks by IP\n",
-        "- `phone` - Perform CNAM lookup\n",
-        "### Crossreferencing\n",
-        "- `sherlock` - Query for sites with that username\n\n",
-        "**Usage**:\n",
-        "- `>>osint email <email>`\n",
-        "- `>>osint username <username>`\n",
-        "- `>>osint password <password>`\n",
-        "- `>>osint name <name>`\n",
-        "- `>>osint hash <hash>`\n",
-        "- `>>osint dehash <hash>`\n",
-        "- `>>osint rehash <password>`\n",
-        "- `>>osint ip <ip>`\n",
-        "- `>>osint last_ip <last ip>`\n",
-        "- `>>osint phone <phone number>`\n",
-        "- `>>osint sherlock <username>`"), 
-        get_random_anime_girl()
-            ).await
-                .unwrap();
-}
-pub async fn osint ( 
-    snusbase: Arc<Mutex<Snusbase>>,
-    bulkvs: Arc<Mutex<BulkVS>>,
-    ctx: serenity::client::Context,
-    msg: Message,
-    mut args: VecDeque<String> 
-) {
-    match args
-        .pop_front()
-        .unwrap_or(String::from("help"))
-        .as_str()
-    {
-        "email" => {
-            tokio::spawn(lookup(snusbase, ctx, msg, args, "email"));
-        },
-        "username" => {
-            tokio::spawn(lookup(snusbase, ctx, msg, args, "username"));
-        },
-        "last_ip" => {
-            tokio::spawn(lookup(snusbase, ctx, msg, args, "last_ip"));
-        },
-        "hash" => {
-            tokio::spawn(lookup(snusbase, ctx, msg, args, "hash"));
-        },
-        "password" => {
-            tokio::spawn(lookup(snusbase, ctx, msg, args, "password"));
-        },
-        "name" => {
-            tokio::spawn(lookup(snusbase, ctx, msg, args, "name"));
-        },
-        "phone" => {
-            if let Some(phone_number) = args.pop_front() {
-                let response = bulkvs.lock()
-                    .await
-                    .query_phone_number(&phone_number);
+    let mut body = String::new();
+    // Warn the user if the username is poor quality
+    if !is_valid_sherlock_username(&username, false) {              
+        body += &format!("### Warning\nThe username `{username}` has special characters and may not return quality results!");
+    }
 
-                if response.is_err() {
-                    send_embed(
-                        &ctx, 
-                        &msg, 
-                        "An error occured", 
-                        &format!("{}", response.unwrap_err()), 
-                        get_random_anime_girl()
-                    ).await
-                        .unwrap();
+    let title = format!("OSINT - Sherlock - {username}");
+    let url = get_random_anime_girl();
+    let mut base_msg = send_embed(
+            &ctx, 
+            &msg, 
+            &title, 
+            "Preparing to search...", 
+            &url
+        ).await
+            .unwrap();
     
-                    return;
-                }
+    // Query Sherlock
+    println!("Querying Sherlock for {username}");
 
-                let response = response.unwrap();
-    
-                let mut message = String::new();
-                if let Some(name) = response.name {
-                    message += &format!("\n- **Name**: {name}");
-                }
-                if let Some(number) = response.number {
-                    message += &format!("\n- **Number**: {number}");
-                }
-                if let Some(time) = response.time {
-                    message += &format!("\n- **Time**: {time}");
-                }
+    body += &format!("\n### {username}\n");
 
-                send_embed(
-                    &ctx, 
-                    &msg, 
-                    "CNAM Lookup", 
-                    &message, 
-                    get_random_anime_girl()
-                ).await
-                    .unwrap();
+    let sherlock_ws_url = std::env::var("SHERLOCK_WS_URL")
+        .expect("SHERLOCK_WS_URL not set!");
+    let (mut socket, response) = connect(&sherlock_ws_url)
+        .expect("Can't connect");
 
-                return;
-            }
-            
-            send_embed(
-                &ctx, 
-                &msg, 
-                "An error occured", 
-                "Missing phone number!", 
-                get_random_anime_girl()
-            ).await
-                .unwrap();
-        },
-        "ip" => {
-            let response = snusbase.lock()
-                .await
-                .whois_ip_query(args.into_iter().collect())
-                .await;
+    println!("Connected to Sherlock API!");
+    println!("Response HTTP code: {}", response.status());
 
-            if response.is_err() {
-                send_embed(
-                    &ctx, 
-                    &msg, 
-                    "An error occured", 
-                    &format!("{}", response.unwrap_err()), 
-                    get_random_anime_girl()
-                ).await
-                    .unwrap();
+    socket.send(tungstenite::protocol::Message::Text(format!("{username}")))
+        .expect("Failed to send message to Sherlock API!");
 
-                return;
-            }
+    // Read messages until the server closes the connection
+    let mut found = false;
+    loop {
+        let message = socket.read().expect("Failed to read message from Sherlock API!");
 
-            let response = response.unwrap();
+        if let tungstenite::protocol::Message::Text(text) = message {
+            if text.contains("http") || text.contains("https") {
+                println!("Found site for {username}: {text}");
 
-            let mut message = String::new();
-            for (ip, content) in &response.results {
-                message += &format!("## IP (*{}*):\n", ip);
+                found = true;
 
-                for (key, value) in content {
-                    if value.is_string() {
-                        message += &format!("\n- **{}**: {:?}", key, value.as_str().unwrap());
-                    } else if value.is_number() {
-                        message += &format!("\n- **{}**: {:?}", key, value.as_number().unwrap());
-                    } else {
-                        message += &format!("\n- **{}**: {:?}", key, value);
-                    }
-                }
-            }
-
-            send_embed(
-                &ctx, 
-                &msg, 
-                "IP Lookup", 
-                &message, 
-                get_random_anime_girl()
-            ).await
-                .unwrap();
-        },
-        "dehash" => {
-            let response = snusbase.lock()
-                .await
-                .dehash(args.into_iter().collect())
-                .await;
-
-            if let Err(e) = response {
-                let error_as_string = format!("{}", e);
-                if &error_as_string == "Failed to convert response to string!" {
-                    send_embed(
-                        &ctx, 
-                        &msg, 
-                        "An error occured", 
-                        &format!("Couldn't deserialize response! This probably means there were way, way too many results.\n\nDon't ask for things like `password123`!\n\nRaw Error: `{}`", error_as_string),
-                        get_random_anime_girl()
-                    ).await.expect("Failed to send message!");
-    
-                    return;
-
-                }
-
-                send_embed(
-                    &ctx, 
-                    &msg, 
-                    "An error occured", 
-                    &format!("{}", error_as_string),
-                    get_random_anime_girl()
-                ).await.expect("Failed to send message!");
-
-                return;
-            }
-
-            let mut body = String::new();
-            let response = response.unwrap();
-            let number_of_dumps = response.results.len();
-            let mut total_results = 0;
-
-            for (dump_ind, ( dump_name, content)) in response.results.iter().enumerate() {
-                body += &format!("## Dump {}/{}:\n*(From `{}`)*\n", dump_ind + 1, number_of_dumps, dump_name);
-
-                let number_of_results_in_dump = content.len();
-                for (result_ind, value) in content.iter().enumerate() {
-                    total_results += 1;
-
-                    for (key, value) in value.as_object().expect("Didn't get an object back from backend?") {
-                        body += &format!("\nResult {}/{}:\n- **{}**: {}\n", result_ind + 1, number_of_results_in_dump, key, value);
-                    }
-                }
-            }
-
-            if total_results > 20 {
-                send_embed(
-                    &ctx, 
-                    &msg, 
-                    "OSINT DUMP - `dehash`", 
-                    "There were more than 20 results, which in total contains more data than Discord can display.\n\nA full dump will be attached below shortly!", 
-                    get_random_anime_girl()
-                ).await
-                    .unwrap();
-        
-                let builder = CreateMessage::new();
-        
-                msg.channel_id.send_files(
-                    &ctx.http,
-                    std::iter::once(CreateAttachment::bytes(
-                        body.as_bytes(),
-                        "full_dump.txt"
-                    )),
-                    builder
-                ).await
-                    .unwrap();
-
-                return;
-            } else if total_results == 0 {
-                send_embed(
-                    &ctx, 
-                    &msg, 
-                    "No results", 
-                    "No results were found for the given query!",
-                    get_random_anime_girl()
-                ).await.expect("Failed to send message!");
-
-                return;
-            }
-
-            send_embed(
-                &ctx, 
-                &msg, 
-                "Dehash Results", 
-                &body,
-                get_random_anime_girl()
-            ).await.expect("Failed to send message!");
-        },
-        "rehash" => {
-            let response = snusbase.lock()
-                .await
-                .rehash(args.into_iter().collect())
-                .await;
-
-            if let Err(e) = response {
-                let error_as_string = format!("{}", e);
-                if &error_as_string == "Failed to convert response to string!" {
-                    send_embed(
-                        &ctx, 
-                        &msg, 
-                        "An error occured", 
-                        &format!("Couldn't deserialize response! This probably means there were way, way too many results.\n\nDon't ask for things like `password123`!\n\nRaw Error: `{}`", error_as_string),
-                        get_random_anime_girl()
-                    ).await.expect("Failed to send message!");
-    
-                    return;
-
-                }
-
-                send_embed(
-                    &ctx, 
-                    &msg, 
-                    "An error occured", 
-                    &format!("{}", error_as_string),
-                    get_random_anime_girl()
-                ).await.expect("Failed to send message!");
-
-                return;
-            }
-
-            let mut body = String::new();
-            let response = response.unwrap();
-            let number_of_dumps = response.results.len();
-            let mut total_results = 0;
-
-            for (dump_ind, ( dump_name, content)) in response.results.iter().enumerate() {
-                body += &format!("## Dump {}/{}:\n*(From `{}`)*\n", dump_ind + 1, number_of_dumps, dump_name);
-
-                let number_of_results_in_dump = content.len();
-                for (result_ind, value) in content.iter().enumerate() {
-                    total_results += 1;
-
-                    for (key, value) in value.as_object().expect("Didn't get an object back from backend?") {
-                        body += &format!("\nResult {}/{}:\n- **{}**: {}\n", result_ind + 1, number_of_results_in_dump, key, value);
-                    }
-                }
-            }
-
-            if total_results > 20 {
-                send_embed(
-                    &ctx, 
-                    &msg, 
-                    "OSINT DUMP - `rehash`", 
-                    "There were more than 20 results, which in total contains more data than Discord can display.\n\nA full dump will be attached below shortly!", 
-                    get_random_anime_girl()
-                ).await
-                    .unwrap();
-        
-                let builder = CreateMessage::new();
-        
-                msg.channel_id.send_files(
-                    &ctx.http,
-                    std::iter::once(CreateAttachment::bytes(
-                        body.as_bytes(),
-                        "full_dump.txt"
-                    )),
-                    builder
-                ).await
-                    .unwrap();
-
-                return;
-            } else if total_results == 0 {
-                send_embed(
-                    &ctx, 
-                    &msg, 
-                    "No results", 
-                    "No results were found for the given query!",
-                    get_random_anime_girl()
-                ).await.expect("Failed to send message!");
-
-                return;
-            }
-
-            send_embed(
-                &ctx, 
-                &msg, 
-                "Dehash Results", 
-                &body,
-                get_random_anime_girl()
-            ).await.expect("Failed to send message!");
-        }
-        "sherlock" => {
-            let username = if let Some(username) = args.pop_front() {
-                username
-            } else {
-                send_embed(
-                    &ctx, 
-                    &msg, 
-                    "Error", 
-                    "Please provide a username!", 
-                    get_random_anime_girl()
-                ).await
-                    .unwrap();
-
-                return;
-            };
-
-            let mut body = String::new();
-            // Warn the user if the username is poor quality
-            if !is_valid_sherlock_username(&username, false) {              
-                body += &format!("### Warning\nThe username `{username}` has special characters and may not return quality results!");
-            }
-
-            let title = format!("OSINT - Sherlock - {username}");
-            let url = get_random_anime_girl();
-            let mut base_msg = send_embed(
-                    &ctx, 
-                    &msg, 
-                    &title, 
-                    "Preparing to search...", 
-                    &url
-                ).await
-                    .unwrap();
-            
-            // Query Sherlock
-            println!("Querying Sherlock for {username}");
-
-            body += &format!("\n### {username}\n");
-
-            let sherlock_ws_url = std::env::var("SHERLOCK_WS_URL")
-                .expect("SHERLOCK_WS_URL not set!");
-            let (mut socket, response) = connect(&sherlock_ws_url)
-                .expect("Can't connect");
-
-            println!("Connected to Sherlock API!");
-            println!("Response HTTP code: {}", response.status());
-
-            socket.send(tungstenite::protocol::Message::Text(format!("{username}")))
-                .expect("Failed to send message to Sherlock API!");
-
-            // Read messages until the server closes the connection
-            let mut found = false;
-            loop {
-                let message = socket.read().expect("Failed to read message from Sherlock API!");
-
-                if let tungstenite::protocol::Message::Text(text) = message {
-                    if text.contains("http") || text.contains("https") {
-                        println!("Found site for {username}: {text}");
-
-                        found = true;
-
-                        body += &format!("{text}");            
-                        edit_embed(
-                            &ctx,
-                            &mut base_msg,
-                            &title,
-                            &body,
-                            url
-                        ).await;
-                    }
-                } else {
-                    break;
-                }
-            }
-
-            if !found {
-                body += &format!("\nNo results found for {username}");
+                body += &format!("{text}");            
                 edit_embed(
                     &ctx,
                     &mut base_msg,
                     &title,
                     &body,
-                    &url
+                    url
                 ).await;
             }
-        },
-        "help" => {
-            tokio::spawn(help( ctx, msg ));
-        },
-        nonexistant => {
-            send_embed(
-                &ctx, 
-                &msg, 
-                "Command does not exist", 
-                &format!("The subcommand `{nonexistant}` is not valid!\n\nConfused?\nRun `>>osint help` for information on `osint`'s commands\nRun `r6 help` for information on all commands"), 
-                get_random_anime_girl()
-            ).await
-                .unwrap();
+        } else {
+            break;
         }
+    }
+
+    if !found {
+        body += &format!("\nNo results found for {username}");
+        edit_embed(
+            &ctx,
+            &mut base_msg,
+            &title,
+            &body,
+            &url
+        ).await;
+    }
+}
+pub async fn sherlock(
+    _backend_handles: BackendHandles,
+    ctx: serenity::client::Context,
+    msg: Message,
+    mut args: VecDeque<String>
+) -> Result<(), String> {
+    let username = args.pop_front()
+        .ok_or(String::from("Please provide a username!"))?;
+
+    tokio::spawn(sherlock_helper(username, ctx, msg));
+
+    Ok(())
+}
+
+pub async fn build_osint_commands() -> R6RSCommand {
+
+    let mut osint_nest_command = R6RSCommand::new_root(
+        String::from("Admin commands, generally intended only for usage by the owner.")
+    );
+    // Create a nest for query-based commands
+    let mut query_nest_command = R6RSCommand::new_root(String::from("Query-based commands for OSINT."));
+    
+    // Attach the query-based commands to the query nest
+    query_nest_command.attach(
+        String::from("email"),
+        R6RSCommand::new_leaf(
+            String::from("Queries for leaks based on an email."),
+            AsyncFnPtr::new(query_email),
+            vec!(vec!(String::from("email")))
+        )
+    );
+    query_nest_command.attach(
+        String::from("username"),
+        R6RSCommand::new_leaf(
+            String::from("Queries for leaks based on a username."),
+            AsyncFnPtr::new(query_username),
+            vec!(vec!(String::from("username")))
+        )
+    );
+    query_nest_command.attach(
+        String::from("ip"),
+        R6RSCommand::new_leaf(
+            String::from("Queries for leaks based on a last IP."),
+            AsyncFnPtr::new(query_last_ip),
+            vec!(vec!(String::from("ip")))
+        )
+    );
+    query_nest_command.attach(
+        String::from("hash"),
+        R6RSCommand::new_leaf(
+            String::from("Queries for leaks based on a hash."),
+            AsyncFnPtr::new(query_hash),
+            vec!(vec!(String::from("hash")))
+        )
+    );
+    query_nest_command.attach(
+        String::from("password"),
+        R6RSCommand::new_leaf(
+            String::from("Queries for leaks based on a password."),
+            AsyncFnPtr::new(query_password),
+            vec!(vec!(String::from("password")))
+        )
+    );
+    query_nest_command.attach(
+        String::from("name"),
+        R6RSCommand::new_leaf(
+            String::from("Queries for leaks based on a name."),
+            AsyncFnPtr::new(query_name),
+            vec!(vec!(String::from("name")))
+        )
+    );
+
+    // Finally, attach the query nest to the main nest
+    osint_nest_command.attach(
+        String::from("query"),
+        query_nest_command
+    );
+
+    // Create the nest for hash-based commands
+    let mut hash_nest_command = R6RSCommand::new_root(String::from("Hash-based commands for OSINT."));
+
+    // Attach the hash-based commands to the hash nest
+    hash_nest_command.attach(
+        String::from("dehash"),
+        R6RSCommand::new_leaf(
+            String::from("Dehashes a hash into pre-cracked passwords."),
+            AsyncFnPtr::new(dehash),
+            vec!(vec!(String::from("hash")))
+        )
+    );
+    hash_nest_command.attach(
+        String::from("rehash"),
+        R6RSCommand::new_leaf(
+            String::from("Rehashes a password into pre-hashed hashes."),
+            AsyncFnPtr::new(rehash),
+            vec!(vec!(String::from("password")))
+        )
+    );
+
+    // Finally, attach the hash nest to the main nest
+    osint_nest_command.attach(
+        String::from("hash"),
+        hash_nest_command
+    );
+
+    // Other commands
+    osint_nest_command.attach(
+        String::from("phone"),
+        R6RSCommand::new_leaf(
+            String::from("Perform a Caller ID lookup on a phone number."),
+            AsyncFnPtr::new(cnam_lookup),
+            vec!(vec!(String::from("phone number")))
+        )
+    );
+    osint_nest_command.attach(
+        String::from("geolocate"),
+        R6RSCommand::new_leaf(
+            String::from("Geolocates an IP."),
+            AsyncFnPtr::new(geolocate),
+            vec!(vec!(String::from("ip")))
+        )
+    );
+    osint_nest_command.attach(
+        String::from("sherlock"),
+        R6RSCommand::new_leaf(
+            String::from("Cross-references sites with a given username."),
+            AsyncFnPtr::new(sherlock),
+            vec!(vec!(String::from("username")))
+        )
+    );
+
+    osint_nest_command
+}
+pub async fn osint ( 
+    osint_nest_command: Arc<Mutex<R6RSCommand>>,
+
+    backend_handles: BackendHandles,
+    ctx: serenity::client::Context,
+    msg: Message,
+    args: VecDeque<String> 
+) {
+    if let Err(err) = osint_nest_command.lock().await.call(
+        backend_handles,
+        ctx.clone(), 
+        msg.clone(), 
+        args
+    ).await {
+        println!("Failed! [{err}]");
+        send_embed(
+            &ctx, 
+            &msg, 
+            "OSINT - Blacklist Error", 
+            &format!("Failed for reason:\n\n\"{err}\""), 
+            get_random_anime_girl()
+        ).await.unwrap();
     }
 }
