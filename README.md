@@ -9,6 +9,49 @@ All sections can be placed behind a Discord User ID whitelist system, allowing s
 
 ## Commands
 
+### Admin
+
+` >>admin blacklist <section> <user id>`
+- Removes a person from the authorized user list.
+
+` >>admin whitelist <section> <user id>`
+- Adds a person to the authorized user list.
+
+### R6
+
+#### Economy
+
+` >>r6 econ analyze <item name | item id>`
+- Creates a detailed data sheet on an item.
+
+` >>r6 econ profit <$ bought for> <item name | item id>`
+- Calculates the amount you would make if you sold your item right now.
+
+` >>r6 econ graph <item name | item id>`
+- Graphs the all-time history of an item.
+
+` >>r6 econ transfer`
+` >>r6 econ transfer <ubisoft email> <ubisoft password>`
+- Finds the items with the least sellers either globally or on the account with the provided login.
+
+` >>r6 econ list`
+` >>r6 econ list <page #>`
+- Lists all available skins.
+
+#### OPSEC
+
+` >>r6 opsec xbox <username>`
+- Lookups up a Ubisoft account based on their registered Xbox username.
+
+` >>r6 opsec psn <username>`
+- Lookups up a Ubisoft account based on their registered PSN username.
+
+` >>r6 opsec applications <username>`
+- Lookups up a Ubisoft account based on their username (PC only).
+
+` >>r6 opsec pc <username>`
+- Lookups up a Ubisoft account based on their registered PC username.
+
 ### OSINT
 
 #### Queries
@@ -16,17 +59,17 @@ All sections can be placed behind a Discord User ID whitelist system, allowing s
 ` >>osint query name <name>`
 - Queries for leaks based on a name.
 
+` >>osint query email <email>`
+- Queries for leaks based on an email.
+
+` >>osint query username <username>`
+- Queries for leaks based on a username.
+
 ` >>osint query ip <ip>`
 - Queries for leaks based on a last IP.
 
 ` >>osint query password <password>`
 - Queries for leaks based on a password.
-
-` >>osint query username <username>`
-- Queries for leaks based on a username.
-
-` >>osint query email <email>`
-- Queries for leaks based on an email.
 
 ` >>osint query hash <hash>`
 - Queries for leaks based on a hash.
@@ -41,57 +84,14 @@ All sections can be placed behind a Discord User ID whitelist system, allowing s
 
 #### Other
 
+` >>osint phone <phone number>`
+- Perform a Caller ID lookup on a phone number.
+
 ` >>osint geolocate <ip>`
 - Geolocates an IP.
 
 ` >>osint sherlock <username>`
 - Cross-references sites with a given username.
-
-` >>osint phone <phone number>`
-- Perform a Caller ID lookup on a phone number.
-
-### Admin
-
-` >>admin whitelist <section> <user id>`
-- Adds a person to the authorized user list.
-
-` >>admin blacklist <section> <user id>`
-- Removes a person from the authorized user list.
-
-### R6
-
-#### OPSEC
-
-` >>r6 opsec pc <username>`
-- Lookups up a Ubisoft account based on their registered PC username.
-
-` >>r6 opsec applications <username>`
-- Lookups up a Ubisoft account based on their username (PC only).
-
-` >>r6 opsec psn <username>`
-- Lookups up a Ubisoft account based on their registered PSN username.
-
-` >>r6 opsec xbox <username>`
-- Lookups up a Ubisoft account based on their registered Xbox username.
-
-#### Economy
-
-` >>r6 econ transfer`
-` >>r6 econ transfer <ubisoft email> <ubisoft password>`
-- Finds the items with the least sellers either globally or on the account with the provided login.
-
-` >>r6 econ graph <item name | item id>`
-- Graphs the all-time history of an item.
-
-` >>r6 econ analyze <item name | item id>`
-- Creates a detailed data sheet on an item.
-
-` >>r6 econ list`
-` >>r6 econ list <page #>`
-- Lists all available skins.
-
-` >>r6 econ profit <$ bought for> <item name | item id>`
-- Calculates the amount you would make if you sold your item right now.
 
 
 ### Setup
