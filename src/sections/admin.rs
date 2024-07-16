@@ -82,7 +82,6 @@ pub async fn blacklist(
     // Save
     save( backend_handles.state ).await;
 
-    println!("Admin - Blacklist Success!");
     send_embed_no_return(
         ctx, 
         msg, 

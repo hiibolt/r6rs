@@ -1,10 +1,12 @@
 use crate::apis::{is_valid_sherlock_username, Snusbase};
 use crate::helper::{ edit_embed, get_random_anime_girl, send_embed, send_embed_no_return, AsyncFnPtr, BackendHandles, R6RSCommand };
+use crate::info;
 
 use serenity::all::{CreateAttachment, CreateMessage, Message};
 use tokio::sync::Mutex;
 use tungstenite::connect;
 use std::{collections::VecDeque, sync::Arc};
+use colored::Colorize;
 
 
 
@@ -468,7 +470,7 @@ pub async fn sherlock_helper(
             .unwrap();
     
     // Query Sherlock
-    println!("Querying Sherlock for {username}");
+    info!("Querying Sherlock for {username}");
 
     body += &format!("\n### {username}\n");
 
@@ -476,9 +478,10 @@ pub async fn sherlock_helper(
         .expect("SHERLOCK_WS_URL not set!");
     let (mut socket, response) = connect(&sherlock_ws_url)
         .expect("Can't connect");
+    let response_code = &response.status();
 
-    println!("Connected to Sherlock API!");
-    println!("Response HTTP code: {}", response.status());
+    info!("Connected to Sherlock API!");
+    info!("Response HTTP code: `{response_code}`");
 
     socket.send(tungstenite::protocol::Message::Text(format!("{username}")))
         .expect("Failed to send message to Sherlock API!");
@@ -490,7 +493,7 @@ pub async fn sherlock_helper(
 
         if let tungstenite::protocol::Message::Text(text) = message {
             if text.contains("http") || text.contains("https") {
-                println!("Found site for {username}: {text}");
+                info!("Found site for {username}: {text}");
 
                 found = true;
 

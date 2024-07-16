@@ -1,4 +1,7 @@
 use serenity::all::{ Context, CreateMessage };
+use colored::Colorize;
+
+use crate::{error, info};
 
 pub mod announce_all;
 pub mod announce_econ;
@@ -15,14 +18,15 @@ async fn dm_to_person (
 
     if let Ok(private_channel) = user_id.create_dm_channel(ctx.clone())
         .await {
-        println!("Channel Id: {:?}", private_channel.id);
+        let channel_id = &private_channel.id;
+        info!("Channel Id: {channel_id:?}");
 
         if let Err(e) = private_channel
             .id
             .send_message(ctx, builder.clone())
             .await 
         {
-            println!("Error sending message to user: {:?}", e);
+            error!("Error sending message to user: {e:?}");
         }
     }
 

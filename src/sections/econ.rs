@@ -1,6 +1,6 @@
 use crate::apis::Ubisoft;
 use crate::helper::{get_random_anime_girl, send_embed_no_return, AsyncFnPtr, BackendHandles, R6RSCommand};
-use crate::Message;
+use crate::{info, Message};
 use serenity::all::{
     CreateMessage,
     CreateEmbed,
@@ -21,6 +21,7 @@ use plotpy::{
     Curve,
     Plot,
 };
+use colored::Colorize;
 
 async fn name_or_item_id( state: Arc<Mutex<State>>, unknown_id: String ) -> Result<String, String> {
     if unknown_id.len() == 0 {
@@ -362,7 +363,7 @@ pub async fn transfer (
     let mut used_login = false;
     if let Some(email) = args.pop_front() {
         if let Some(password) = args.pop_front() {
-            println!("Logging in with email: {} and password: {}", email, password);
+            info!("Logging in with email: {email} and password: {password}");
 
             let temporary_ubisoft_api = Arc::new(Mutex::new(Ubisoft::new(email, password)));
 

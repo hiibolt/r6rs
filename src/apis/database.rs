@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 use anyhow::{ Result, Context };
+use crate::info;
+use colored::Colorize;
 
 #[derive(Debug)]
 pub struct Database {
@@ -53,6 +55,8 @@ impl Database {
             .set("Content-Type", "application/json")
             .send_string(&stringified_entry)
             .context("Failed to send the request!")?;
+
+        info!("Command uploaded successfully!");
 
         Ok(())
     }

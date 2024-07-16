@@ -1,11 +1,12 @@
 use base64::prelude::*;
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
-use crate::Value;
+use crate::{error, info, Value};
 use reqwest::StatusCode;
 use tokio::{fs::read_to_string, time::{ sleep, Duration }};
 use crate::{ Arc, Mutex };
 use anyhow::{ Result, bail, anyhow, Context };
+use colored::Colorize;
 
 #[derive(Debug)]
 pub struct Ubisoft {
@@ -20,8 +21,6 @@ impl Ubisoft {
 
     pub fn new ( email: String, password: String ) -> Self {
         let token = Self::get_basic_token( email.clone(), password.clone() );
-
-        println!("Token: {token}");
 
         Self {
             token,
@@ -53,10 +52,10 @@ impl Ubisoft {
                 self.headers.insert("Authorization", format!("Ubi_v1 t={}", response_json["ticket"].as_str().ok_or(anyhow!("Ticket missing from Ubi response!"))?).parse()?);
                 self.headers.insert("Ubi-SessionId", response_json["sessionId"].as_str().ok_or(anyhow!("Ticket missing from Ubi response!"))?.parse()?);
     
-                println!("Successfully authenticated!");
+                info!("Successfully authenticated!");
             },
             _ => {
-                println!("Failed to authenticate! Response: \"{response:#?}\"");
+                error!("Failed to authenticate! Response: \"{response:#?}\"");
 
                 bail!("Failed to authenticate with given login! Verify your information is correct.");
             }
@@ -66,7 +65,7 @@ impl Ubisoft {
     }
     pub async fn auto_login( state: Arc<Mutex<Ubisoft>> ) {
         loop {
-            println!("[ Reauthenticating with Ubisoft! ]");
+            info!("Reauthenticating with Ubisoft!");
 
             state
                 .lock().await
@@ -166,7 +165,7 @@ impl Ubisoft {
         &mut self,
         number_of_items: usize
     ) -> Result<Vec<DisplayableItem>> {
-        println!("Attempting GraphQL request...");
+        info!("Attempting GraphQL request...");
     
         // Load the `query.txt` file
         let path = "assets/query.txt";
@@ -178,7 +177,7 @@ impl Ubisoft {
         let mut items: Vec<DisplayableItem> = Vec::new();
     
         while items.len() < number_of_items {
-            println!("Passing with offset: {}", offset);
+            info!("Passing with offset: {offset}");
     
             let lowest_sales_raw: Value = self
                 .graphql_request(
@@ -213,7 +212,7 @@ impl Ubisoft {
         &mut self,
         number_of_items: usize
     ) -> Result<Vec<DisplayableItem>> {
-        println!("Attempting GraphQL request...");
+        info!("Attempting GraphQL request...");
     
         // Load the `query.txt` file
         let path = "assets/query_owned.txt";
@@ -225,7 +224,7 @@ impl Ubisoft {
         let mut items: Vec<DisplayableItem> = Vec::new();
     
         while items.len() < number_of_items {
-            println!("Passing with offset: {}", offset);
+            info!("Passing with offset: {offset}");
     
             let lowest_sales_raw: Value = self
                 .graphql_request(

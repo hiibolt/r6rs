@@ -3,12 +3,14 @@ use crate::helper::send_embed_no_return;
 use crate::helper::AsyncFnPtr;
 use crate::helper::BackendHandles;
 use crate::helper::R6RSCommand;
+use crate::info;
 use crate::VecDeque;
 use crate::Message;
 use crate::send_embed;
 use crate::Ubisoft;
 use crate::Value;
 use crate::{ Arc, Mutex };
+use colored::Colorize;
 use anyhow::{ Result, anyhow };
 use std::collections::HashSet;
 
@@ -202,7 +204,7 @@ async fn applications_helper(
     ).await
         .unwrap();
 
-    println!("Result: {res}");
+    info!("Result: {res}");
 
     Ok(())
 }
@@ -293,7 +295,7 @@ pub async fn build_opsec_commands() -> R6RSCommand {
     opsec_nest_command.attach(
         String::from("pc"),
         R6RSCommand::new_leaf(
-            String::from("Looks up up a Ubisoft account based on their registered PC username."),
+            String::from("Looks up a Ubisoft account based on their registered PC username."),
             AsyncFnPtr::new(lookup_pc),
             vec!(vec!(String::from("username"))),
             Some(String::from("opsec"))
@@ -302,7 +304,7 @@ pub async fn build_opsec_commands() -> R6RSCommand {
     opsec_nest_command.attach(
         String::from("xbox"),
         R6RSCommand::new_leaf(
-            String::from("Looks up up a Ubisoft account based on their registered Xbox username."),
+            String::from("Looks up a Ubisoft account based on their registered Xbox username."),
             AsyncFnPtr::new(lookup_xbox),
             vec!(vec!(String::from("username"))),
             Some(String::from("opsec"))
@@ -311,7 +313,7 @@ pub async fn build_opsec_commands() -> R6RSCommand {
     opsec_nest_command.attach(
         String::from("psn"),
         R6RSCommand::new_leaf(
-            String::from("Looks up up a Ubisoft account based on their registered PSN username."),
+            String::from("Looks up a Ubisoft account based on their registered PSN username."),
             AsyncFnPtr::new(lookup_psn),
             vec!(vec!(String::from("username"))),
             Some(String::from("opsec"))
@@ -320,7 +322,7 @@ pub async fn build_opsec_commands() -> R6RSCommand {
     opsec_nest_command.attach(
         String::from("applications"),
         R6RSCommand::new_leaf(
-            String::from("Looks up up a Ubisoft account based on their username (PC only)."),
+            String::from("Looks up a Ubisoft account based on their username (PC only)."),
             AsyncFnPtr::new(applications),
             vec!(vec!(String::from("username"))),
             Some(String::from("opsec"))

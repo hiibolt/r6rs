@@ -1,7 +1,8 @@
 use std::collections::HashSet;
 use serenity::all::Message;
 use tungstenite::connect;
-use crate::helper::edit_embed;
+use crate::{helper::edit_embed, info};
+use colored::Colorize;
 
 
 pub async fn get_and_stringify_potential_profiles( 
@@ -29,7 +30,7 @@ pub async fn get_and_stringify_potential_profiles(
 
     // Query Sherlock
     for username in valid_usernames.iter() {
-        println!("Querying Sherlock for {username}");
+        info!("Querying Sherlock for {username}");
 
         *body += &format!("\n### {username}\n");
 
@@ -37,9 +38,10 @@ pub async fn get_and_stringify_potential_profiles(
             .expect("SHERLOCK_WS_URL not set!");
         let (mut socket, response) = connect(&sherlock_ws_url)
             .expect("Can't connect");
+        let status = response.status();
 
-        println!("Connected to Sherlock API!");
-        println!("Response HTTP code: {}", response.status());
+        info!("Connected to Sherlock API!");
+        info!("Response HTTP code: {status}");
 
         socket.send(tungstenite::protocol::Message::Text(format!("{username}")))
             .expect("Failed to send message to Sherlock API!");
@@ -51,7 +53,7 @@ pub async fn get_and_stringify_potential_profiles(
 
             if let tungstenite::protocol::Message::Text(text) = message {
                 if text.contains("http") || text.contains("https") {
-                    println!("Found site for {username}: {text}");
+                    info!("Found site for {username}: {text}");
 
                     found = true;
 

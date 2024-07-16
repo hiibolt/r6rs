@@ -4,6 +4,7 @@ use crate::apis::Snusbase;
 use crate::apis::Ubisoft;
 use crate::Message;
 use crate::State;
+use crate::daemon;
 use crate::{ Arc, Mutex };
 use crate::read_to_string;
 use std::fs::OpenOptions;
@@ -19,6 +20,10 @@ use std::collections::HashMap;
 use anyhow::{ anyhow, bail, Context };
 use async_recursion::async_recursion;
 use std::collections::VecDeque;
+use colored::Colorize;
+
+pub mod print;
+pub use print::*;
 
 #[derive(Clone)]
 pub struct BackendHandles {
@@ -220,8 +225,6 @@ impl R6RSCommand {
                 commands.get_mut(&next_command)
                     .expect("Unreachable!")
                     .call(backend_handles, ctx, msg, args).await?;
-
-                println!("Root command!");
                 Ok(())
             },
             R6RSCommandType::LeafCommand(R6RSLeafCommand{function, required_authorization, valid_args: _}) => {
@@ -268,7 +271,7 @@ pub async fn inject_documentation(
         .write_all(injected.as_bytes())
         .context("Failed to write to `README.md`! Is the file in use?")?;
 
-    println!("[ Succesfully injected documentation! :3 ]");
+    startup("Succesfully injected documentation! :3");
 
     Ok(())
 }
@@ -287,7 +290,7 @@ pub async fn save( state: Arc<Mutex<State>> ) {
         .write_all(bot_data_serialized.as_bytes())
         .expect("Failed to write to `assets/bot_data.json`! Is the file in use?");
 
-    println!("[ Succesfully saved! :3 ]");
+    daemon!("Succesfully saved! :3");
 }
 pub async fn autosave( state: Arc<Mutex<State>> ) {
     loop {
@@ -298,7 +301,7 @@ pub async fn autosave( state: Arc<Mutex<State>> ) {
 }
 pub async fn autopull( state: Arc<Mutex<State>> ) {
     loop {
-        println!("[ Pulled market data :3 ]");
+        daemon!("Pulled market data :3");
 
         let market_data_contents: String = read_to_string("assets/data.json")
             .expect("Could not find 'assets/data.json', please ensure you have created one!");

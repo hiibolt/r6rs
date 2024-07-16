@@ -7,7 +7,6 @@ use crate::{
     helper::{ send_embed, get_random_anime_girl },
     apis::{ Snusbase, BulkVS, Ubisoft, Database }
 };
-
 use std::{
     env,
     collections::VecDeque,
@@ -16,7 +15,7 @@ use std::{
 };
 
 use apis::database::CommandEntry;
-use helper::{inject_documentation, BackendHandles, R6RSCommand};
+use helper::{inject_documentation, startup, BackendHandles, R6RSCommand};
 use tokio::sync::Mutex;
 use serde_json::Value;
 use serenity::{all::{ActivityData, ActivityType, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Interaction, OnlineStatus}, async_trait};
@@ -26,6 +25,7 @@ use serenity::prelude::*;
 use url::Url;
 use std::collections::HashMap;
 use anyhow::Result;
+use colored::Colorize;
 
 struct State {
     bot_data: Value,
@@ -71,8 +71,11 @@ impl EventHandler for Bot {
                 server_id,
                 command: msg.content.clone()
             }) {
-            println!("Failed to update DB with reason `{e}`!");
+            warn!("Failed to update DB with reason `{e}`!");
         }
+
+        let content = &msg.content;
+        info!("Received command: {content}");
         
         if let Err(err) = self.root_command.lock().await.call(
             self.backend_handles.clone(),
@@ -80,7 +83,7 @@ impl EventHandler for Bot {
             msg.clone(), 
             args
         ).await {
-            println!("Failed! [{err}]");
+            error!("Failed! [{err}]");
             send_embed(
                 &ctx, 
                 &msg, 
@@ -97,7 +100,8 @@ impl EventHandler for Bot {
         interaction: Interaction
     ) {
         if let Interaction::Command(command) = interaction {
-            println!("Received command interaction: {}", command.data.name);
+            let command_name = &command.data.name;
+            info!("Received command interaction: {command_name}");
 
             let content = match command.data.name.as_str() {
                 "announce" => {
@@ -152,7 +156,7 @@ impl EventHandler for Bot {
                 let data = CreateInteractionResponseMessage::new().content(content);
                 let builder = CreateInteractionResponse::Message(data);
                 if let Err(why) = command.create_response(&ctx.http, builder).await {
-                    println!("Cannot respond to slash command: {why}");
+                    error!("Cannot respond to slash command: {why}");
                 }
             }
         }
@@ -164,8 +168,6 @@ impl EventHandler for Bot {
     //
     // In this case, just print what the current user's username is.
     async fn ready(&self, ctx: serenity::client::Context, ready: Ready) {
-        println!("{} is connected with data!", ready.user.name);
-
         let guild_id = GuildId::new(
             env::var("GUILD_ID")
                 .expect("Expected GUILD_ID in environment")
@@ -187,7 +189,9 @@ impl EventHandler for Bot {
             .iter()
             .map(|x| x.name.clone())
             .collect::<Vec<String>>();
-        println!("I now have the following guild slash commands: {command_names:?}");
+        startup(&format!("I now have the following guild slash commands: {command_names:#?}"));
+
+        startup(&format!("Bot \"{}\" is connected with data!", ready.user.name));
     }
 }
 pub async fn help( 
@@ -300,7 +304,7 @@ async fn main() -> Result<()> {
     if let Err(e) = database
         .lock().await
         .verify_db() {
-        println!("Failed to update DB with reason `{e}`!");
+        warn!("Failed to update DB with reason `{e}`!");
     }
 
     // Start login process
@@ -376,9 +380,7 @@ async fn main() -> Result<()> {
         .await.expect("Err creating client");
     
     // Start r6rs
-    if let Err(why) = client.start().await {
-        println!("Client error: {why:?}");
-    }
+    client.start().await?;
 
     Ok(())
 }
