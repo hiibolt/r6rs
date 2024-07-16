@@ -1,11 +1,11 @@
-use colored::Colorize;
+#[macro_export]
+macro_rules! startup{
+    ($a:expr) => {
+        let message = format!($a);
+        let to_print = format!("[Startup] {}", message);
 
-pub fn startup(
-    message: &str
-) {
-    let to_print = format!("[Startup] {}", message);
-
-    println!("{}", to_print.green());
+        println!("{}", to_print.green());
+    }
 }
 #[macro_export]
 macro_rules! info{

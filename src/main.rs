@@ -15,7 +15,7 @@ use std::{
 };
 
 use apis::database::CommandEntry;
-use helper::{inject_documentation, startup, BackendHandles, R6RSCommand};
+use helper::{inject_documentation, BackendHandles, R6RSCommand};
 use tokio::sync::Mutex;
 use serde_json::Value;
 use serenity::{all::{ActivityData, ActivityType, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Interaction, OnlineStatus}, async_trait};
@@ -189,9 +189,10 @@ impl EventHandler for Bot {
             .iter()
             .map(|x| x.name.clone())
             .collect::<Vec<String>>();
-        startup(&format!("I now have the following guild slash commands: {command_names:#?}"));
+        startup!("I now have the following guild slash commands: {command_names:#?}");
 
-        startup(&format!("Bot \"{}\" is connected with data!", ready.user.name));
+        let bot_name = ready.user.name.clone();
+        startup!("Bot \"{bot_name}\" is connected with data!");
     }
 }
 pub async fn help( 

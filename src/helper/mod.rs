@@ -2,6 +2,7 @@ use crate::apis::BulkVS;
 use crate::apis::Database;
 use crate::apis::Snusbase;
 use crate::apis::Ubisoft;
+use crate::startup;
 use crate::Message;
 use crate::State;
 use crate::daemon;
@@ -23,7 +24,6 @@ use std::collections::VecDeque;
 use colored::Colorize;
 
 pub mod print;
-pub use print::*;
 
 #[derive(Clone)]
 pub struct BackendHandles {
@@ -261,17 +261,23 @@ pub async fn inject_documentation(
     let inject_marker = "<!-- INJECT MARKER -->";
     let injected = template.replace(inject_marker, body);
 
-    // Write the injected template to `README.md`
-    OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open("README.md")
-        .context("Failed to open file handle to `README.md`! Does the file exist?")?
-        .write_all(injected.as_bytes())
-        .context("Failed to write to `README.md`! Is the file in use?")?;
+    if injected != read_to_string("README.md")
+        .context("Failed to read `README.md`! Does the file exist?")? {
+        // Write the injected template to `README.md`
+        OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open("README.md")
+            .context("Failed to open file handle to `README.md`! Does the file exist?")?
+            .write_all(injected.as_bytes())
+            .context("Failed to write to `README.md`! Is the file in use?")?;
+    } else {
+        startup!("Documentation is already up to date! :3");
+    }
 
-    startup("Succesfully injected documentation! :3");
+
+    startup!("Succesfully injected documentation! :3");
 
     Ok(())
 }
