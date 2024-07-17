@@ -22,13 +22,50 @@ All commands are alternatively available as slash commands that better indicate 
 
 ## Commands
 
+### OSINT
+
+#### Hashing
+
+` >>osint hash dehash <hash>`
+- Dehashes a hash into pre-cracked passwords.
+
+` >>osint hash rehash <password>`
+- Rehashes a password into pre-hashed hashes.
+
+#### Queries
+
+` >>osint query name <name>`
+- Queries for leaks based on a name.
+
+` >>osint query email <email>`
+- Queries for leaks based on an email.
+
+` >>osint query password <password>`
+- Queries for leaks based on a password.
+
+` >>osint query username <username>`
+- Queries for leaks based on a username.
+
+` >>osint query ip <ip>`
+- Queries for leaks based on a last IP.
+
+` >>osint query hash <hash>`
+- Queries for leaks based on a hash.
+
+#### Other
+
+` >>osint phone <phone number>`
+- Perform a Caller ID lookup on a phone number.
+
+` >>osint geolocate <ip>`
+- Geolocates an IP.
+
+` >>osint sherlock <username>`
+- Cross-references sites with a given username.
+
 ### R6
 
 #### Economy
-
-` >>r6 econ list`
-` >>r6 econ list <page #>`
-- Lists all available skins.
 
 ` >>r6 econ analyze <item name | item id>`
 - Creates a detailed data sheet on an item.
@@ -36,12 +73,16 @@ All commands are alternatively available as slash commands that better indicate 
 ` >>r6 econ profit <$ bought for> <item name | item id>`
 - Calculates the amount you would make if you sold your item right now.
 
+` >>r6 econ graph <item name | item id>`
+- Graphs the all-time history of an item.
+
+` >>r6 econ list`
+` >>r6 econ list <page #>`
+- Lists all available skins.
+
 ` >>r6 econ transfer`
 ` >>r6 econ transfer <ubisoft email> <ubisoft password>`
 - Finds the items with the least sellers either globally or on the account with the provided login.
-
-` >>r6 econ graph <item name | item id>`
-- Graphs the all-time history of an item.
 
 #### OPSEC
 
@@ -59,59 +100,18 @@ All commands are alternatively available as slash commands that better indicate 
 
 ### Admin
 
-` >>admin dm <user id> <message>`
-- DMs a message to a specific user.
-
-` >>admin announce <sections> <message>`
-- Announces a message to all whitelisted users.
-
 ` >>admin whitelist <section> <user id>`
 - Adds a person to the authorized user list.
+
+` >>admin dm <user id> <message>`
+- DMs a message to a specific user.
 
 ` >>admin blacklist <section> <user id>`
 - Removes a person from the authorized user list.
 
-### OSINT
-
-#### Queries
-
-` >>osint query ip <ip>`
-- Queries for leaks based on a last IP.
-
-` >>osint query username <username>`
-- Queries for leaks based on a username.
-
-` >>osint query hash <hash>`
-- Queries for leaks based on a hash.
-
-` >>osint query email <email>`
-- Queries for leaks based on an email.
-
-` >>osint query password <password>`
-- Queries for leaks based on a password.
-
-` >>osint query name <name>`
-- Queries for leaks based on a name.
-
-#### Hashing
-
-` >>osint hash dehash <hash>`
-- Dehashes a hash into pre-cracked passwords.
-
-` >>osint hash rehash <password>`
-- Rehashes a password into pre-hashed hashes.
-
-#### Other
-
-` >>osint phone <phone number>`
-- Perform a Caller ID lookup on a phone number.
-
-` >>osint geolocate <ip>`
-- Geolocates an IP.
-
-` >>osint sherlock <username>`
-- Cross-references sites with a given username.
+` >>admin announce <sections> <message>`
+- Announces a message to all whitelisted users.
 
 
 ## Setup
-While open source, I do *not* provide setup instructions. If such a tool interests you, join the [Discord](https://discord.gg/ENGqjywsbm) for details on purchasing access!
+While open source, I do *not* provide setup instructions, nor do I plan to. This software is open source solely for the purpose of transparency. If such a tool interests you, join the [Discord](https://discord.gg/ENGqjywsbm) for details on purchasing access!

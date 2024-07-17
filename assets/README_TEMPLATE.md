@@ -22,4 +22,4 @@ All commands are alternatively available as slash commands that better indicate 
 <!-- INJECT MARKER -->
 
 ## Setup
-While open source, I do *not* provide setup instructions. If such a tool interests you, join the [Discord](https://discord.gg/ENGqjywsbm) for details on purchasing access!
+While open source, I do *not* provide setup instructions, nor do I plan to. This software is open source solely for the purpose of transparency. If such a tool interests you, join the [Discord](https://discord.gg/ENGqjywsbm) for details on purchasing access!
