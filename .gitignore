@@ -1,5 +1,4 @@
 /target
 .direnv
 .envrc
-/sherlock_output
 test.py
