@@ -14,7 +14,7 @@ use apis::database::CommandEntry;
 use helper::{inject_documentation, BackendHandles, GenericMessage, R6RSCommand};
 use tokio::sync::Mutex;
 use serde_json::Value;
-use serenity::{all::{ActivityData, ActivityType, GuildId, Interaction, OnlineStatus, ResolvedValue}, async_trait};
+use serenity::{all::{ActivityData, ActivityType, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Interaction, OnlineStatus, ResolvedValue}, async_trait};
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
@@ -149,6 +149,16 @@ impl EventHandler for Bot {
                     command: message.content.clone() + " - [slash command]"
                 }) {
                 warn!("Failed to update DB with reason `{e}`!");
+            }
+
+            // Let the user know you're about to start working
+            if let Err(why) = command.create_response(
+                &ctx.http, 
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new().content("` Getting to work... `")
+                )
+            ).await {
+                error!("Cannot respond to slash command: {why}");
             }
 
             // Call the command
@@ -304,6 +314,7 @@ async fn main() -> Result<()> {
     // Start autopull
     tokio::spawn(helper::autopull( state.clone() ));
 
+    // Build the root command
     let admin_commands   = sections::admin::build_admin_commands().await;
     let econ_commands    = sections::econ::build_econ_commands().await;
     let osint_commands   = sections::osint::build_osint_commands().await;
