@@ -1,20 +1,24 @@
-use crate::apis::get_and_stringify_potential_profiles;
-use crate::helper::send_embed_no_return;
-use crate::helper::AsyncFnPtr;
-use crate::helper::BackendHandles;
-use crate::helper::GenericMessage;
-use crate::helper::R6RSCommand;
-use crate::info;
-use crate::startup;
-use crate::VecDeque;
-use crate::send_embed;
-use crate::Ubisoft;
-use crate::Value;
-use crate::{ Arc, Mutex };
-use colored::Colorize;
-use anyhow::{ Result, anyhow };
+use crate::{
+    apis::get_and_stringify_potential_profiles,
+    helper::{
+        lib::{send_embed_no_return, AsyncFnPtr},
+        bot::{BackendHandles, GenericMessage},
+        command::R6RSCommand,
+    },
+    info,
+    startup,
+    VecDeque,
+    send_embed,
+    Ubisoft,
+    Value,
+    Arc,
+    Mutex,
+    Colorize,
+};
+
 use std::collections::HashSet;
 
+use anyhow::{Result, anyhow};
 
 async fn get_profiles(
     ubisoft_api: Arc<Mutex<Ubisoft>>,

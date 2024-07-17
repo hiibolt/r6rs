@@ -1,7 +1,7 @@
+use crate::{Colorize, info};
+
 use serde::{Deserialize, Serialize};
 use anyhow::{ Result, Context };
-use crate::info;
-use colored::Colorize;
 
 #[derive(Debug)]
 pub struct Database {

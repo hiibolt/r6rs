@@ -1,14 +1,19 @@
-use crate::apis::{is_valid_sherlock_username, Snusbase};
-use crate::helper::{ edit_embed, get_random_anime_girl, send_embed, send_embed_no_return, AsyncFnPtr, BackendHandles, GenericMessage, R6RSCommand };
-use crate::{info, startup};
+use crate::{
+    apis::{is_valid_sherlock_username, Snusbase},
+    helper::{
+        lib::{edit_embed, get_random_anime_girl, send_embed, send_embed_no_return, AsyncFnPtr},
+        bot::{BackendHandles, GenericMessage}, 
+        command::R6RSCommand
+    },
+    info, startup,
+    Colorize
+};
+
+use std::{collections::VecDeque, sync::Arc};
 
 use serenity::all::{CreateAttachment, CreateMessage};
 use tokio::sync::Mutex;
 use tungstenite::connect;
-use std::{collections::VecDeque, sync::Arc};
-use colored::Colorize;
-
-
 
 pub async fn lookup( 
     snusbase: Arc<Mutex<Snusbase>>,

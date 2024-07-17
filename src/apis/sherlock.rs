@@ -1,8 +1,13 @@
+use crate::{
+    helper::lib::edit_embed, 
+    info,
+    Colorize
+};
+
 use std::collections::HashSet;
+
 use serenity::all::Message;
 use tungstenite::connect;
-use crate::{helper::edit_embed, info};
-use colored::Colorize;
 
 
 pub async fn get_and_stringify_potential_profiles( 

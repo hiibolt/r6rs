@@ -1,27 +1,30 @@
-use crate::apis::Ubisoft;
-use crate::helper::{get_random_anime_girl, send_embed_no_return, AsyncFnPtr, BackendHandles, GenericMessage, R6RSCommand};
-use crate::{info, startup};
+use crate::{
+    apis::Ubisoft,
+    helper::{
+        lib::{get_random_anime_girl, send_embed_no_return, AsyncFnPtr}, 
+        bot::{BackendHandles, State, GenericMessage}, 
+        command::R6RSCommand
+    },
+    info, startup,
+    VecDeque,
+    Colorize,
+    Mutex, Arc
+};
+
+use std::time::{
+    SystemTime,
+    UNIX_EPOCH
+};
+
 use serenity::all::{
     CreateMessage,
     CreateEmbed,
     CreateAttachment
 };
-use crate::{
-    VecDeque,
-
-    Mutex,
-    Arc
-};
-use crate::State;
-use std::time::{
-    SystemTime,
-    UNIX_EPOCH
-};
 use plotpy::{
     Curve,
     Plot,
 };
-use colored::Colorize;
 
 async fn name_or_item_id( state: Arc<Mutex<State>>, unknown_id: String ) -> Result<String, String> {
     if unknown_id.len() == 0 {

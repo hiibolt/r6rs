@@ -1,18 +1,12 @@
+use crate::{
+    helper::bot::{BackendHandles, GenericMessage},
+    helper::lib::{dm_to_person, get_random_anime_girl, send_embed_no_return, AsyncFnPtr, save},
+    helper::command::R6RSCommand,
+    info, startup, VecDeque,
+    Colorize,
+};
+
 use std::collections::HashSet;
-
-use crate::helper::dm_to_person;
-use crate::helper::get_random_anime_girl;
-use crate::helper::send_embed_no_return;
-use crate::helper::AsyncFnPtr;
-use crate::helper::BackendHandles;
-use crate::helper::GenericMessage;
-use crate::helper::R6RSCommand;
-use crate::info;
-use crate::startup;
-use crate::VecDeque;
-use crate::helper::save;
-use crate::Colorize;
-
 
 pub async fn whitelist(
     backend_handles: BackendHandles,

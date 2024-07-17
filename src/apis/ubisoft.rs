@@ -1,12 +1,16 @@
-use base64::prelude::*;
-use reqwest::header::HeaderMap;
-use serde::{Deserialize, Serialize};
-use crate::{error, info, Value};
-use reqwest::StatusCode;
-use tokio::{fs::read_to_string, time::{ sleep, Duration }};
-use crate::{ Arc, Mutex };
-use anyhow::{ Result, bail, anyhow, Context };
+use crate::{
+    error, info, Value, Arc, Mutex, 
+};
+
 use colored::Colorize;
+use serde::{Deserialize, Serialize};
+use base64::prelude::*;
+use anyhow::{Result, bail, anyhow, Context};
+use reqwest::{header::HeaderMap, StatusCode};
+use tokio::{
+    fs::read_to_string, 
+    time::{sleep, Duration}
+};
 
 #[derive(Debug)]
 pub struct Ubisoft {
