@@ -10,6 +10,8 @@ use crate::{ Arc, Mutex };
 use crate::read_to_string;
 use std::fs::OpenOptions;
 use std::io::Write;
+use serenity::all::CreateCommand;
+use serenity::all::CreateCommandOption;
 use tokio::time::{ sleep, Duration };
 use serenity::model::colour::Colour;
 use serenity::all::EditMessage;
@@ -118,6 +120,62 @@ impl R6RSCommand {
             },
             _ => panic!("Cannot attach a command to a leaf command!")
         }
+    }
+
+    #[async_recursion]
+    pub async fn build_commands(
+        &mut self,
+        prefix: String,
+    ) -> Vec<CreateCommand> {
+        let mut ret = Vec::new();
+        
+        let R6RSRootCommand{ commands, section_title: _ } = if let R6RSCommandType::RootCommand(root_command) = &mut self.inner {
+            root_command
+        } else {
+            panic!("Cannot build commands on a leaf command!");
+        };
+
+        // Iterate through each command
+        for (name, command) in commands.iter_mut() {
+            match &command.inner {
+                R6RSCommandType::RootCommand(_) => {
+                    let nested_commands = command.build_commands(prefix.clone() + "-" + &name).await;
+                    ret.extend(nested_commands);
+                },
+                R6RSCommandType::LeafCommand(R6RSLeafCommand{required_authorization: _, valid_args, function: _}) => {
+                    let options: Vec<String> = valid_args.iter().max_by_key(|set| set.len())
+                        .expect("Leaf commands must have at least one valid argument set!")
+                        .iter()
+                        .map(|arg| {
+                            arg.replace(" ", "-")
+                                .replace("$", "")
+                                .replace("|", "or")
+                                .replace("#", "num")
+                        })
+                        .collect();
+                    let required = valid_args.len() == 1;
+
+                    let command_name = format!("{}-{}", prefix, name).replace("->>", "");
+                    let description: String = String::from("Run >>help to see a description!");
+                    let mut command = CreateCommand::new(&command_name)
+                        .description(&description);
+
+                    for option in &options {
+                        command = command.add_option(
+                            CreateCommandOption::new(
+                                serenity::all::CommandOptionType::String,
+                                option,
+                                "Argument"
+                            )
+                            .required(required));
+                    }
+
+                    ret.push(command);
+                }
+            }
+        }
+
+        ret
     }
 
     #[async_recursion]

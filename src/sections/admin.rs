@@ -3,9 +3,11 @@ use crate::helper::send_embed_no_return;
 use crate::helper::AsyncFnPtr;
 use crate::helper::BackendHandles;
 use crate::helper::R6RSCommand;
+use crate::startup;
 use crate::VecDeque;
 use crate::Message;
 use crate::helper::save;
+use crate::Colorize;
 
 
 pub async fn whitelist(
@@ -116,6 +118,8 @@ pub async fn build_admin_commands() -> R6RSCommand {
             Some(String::from("admin")),
         )
     );
+
+    startup!("Admin commands have been built.");
 
     admin_nest_command
 }

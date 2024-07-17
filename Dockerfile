@@ -11,6 +11,7 @@ FROM python:3.12-slim
 
 # Import needed data
 COPY --from=build /target/release/r6rs /r6rs
+COPY --from=build /README.md /README.md
 VOLUME /assets
 
 # Add Tini

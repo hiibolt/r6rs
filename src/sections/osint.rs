@@ -1,6 +1,6 @@
 use crate::apis::{is_valid_sherlock_username, Snusbase};
 use crate::helper::{ edit_embed, get_random_anime_girl, send_embed, send_embed_no_return, AsyncFnPtr, BackendHandles, R6RSCommand };
-use crate::info;
+use crate::{info, startup};
 
 use serenity::all::{CreateAttachment, CreateMessage, Message};
 use tokio::sync::Mutex;
@@ -670,6 +670,8 @@ pub async fn build_osint_commands() -> R6RSCommand {
             Some(String::from("osint"))
         )
     );
+
+    startup!("OSINT commands have been built.");
 
     osint_nest_command
 }

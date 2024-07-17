@@ -4,6 +4,7 @@ use crate::helper::AsyncFnPtr;
 use crate::helper::BackendHandles;
 use crate::helper::R6RSCommand;
 use crate::info;
+use crate::startup;
 use crate::VecDeque;
 use crate::Message;
 use crate::send_embed;
@@ -328,6 +329,8 @@ pub async fn build_opsec_commands() -> R6RSCommand {
             Some(String::from("opsec"))
         )
     );
+
+    startup!("OPSEC commands have been built.");
 
     opsec_nest_command
 }

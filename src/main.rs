@@ -8,10 +8,7 @@ use crate::{
     apis::{ Snusbase, BulkVS, Ubisoft, Database }
 };
 use std::{
-    env,
-    collections::VecDeque,
-    fs::read_to_string,
-    sync::Arc
+    collections::VecDeque, env, fs::read_to_string, sync::Arc
 };
 
 use apis::database::CommandEntry;
@@ -175,15 +172,33 @@ impl EventHandler for Bot {
                 .expect("GUILD_ID must be an integer"),
         );
 
-        let commands = guild_id
-            .set_commands(&ctx.http, vec![
-                commands::announce_all::register(),
-                commands::announce_opsec::register(),
-                commands::announce_econ::register(),
-                commands::announce_osint::register(),
-                commands::development::register()
-            ])
-            .await.expect("Failed to register guild commands!");
+        let mut auto_generated_commands = self.root_command
+            .lock().await
+            .build_commands("".into())
+            .await;
+        let mut all_commands = vec![
+            commands::announce_all::register(),
+            commands::announce_opsec::register(),
+            commands::announce_econ::register(),
+            commands::announce_osint::register(),
+            commands::development::register()
+        ];
+        all_commands.append(&mut auto_generated_commands);
+
+        let commands = match guild_id
+            .set_commands(&ctx.http, all_commands.clone())
+            .await {
+                Ok(commands) => commands,
+                Err(why) => {
+                    for x in 0..all_commands.len() {
+                        let copy = &all_commands[x];
+                        println!("Command {x}:\n{copy:#?}");
+                    }
+
+                    error!("Failed to register commands: {why:#?}");
+                    return;
+                }
+        };
 
         let command_names = commands
             .iter()
@@ -194,47 +209,6 @@ impl EventHandler for Bot {
         let bot_name = ready.user.name.clone();
         startup!("Bot \"{bot_name}\" is connected with data!");
     }
-}
-pub async fn help( 
-    ctx: serenity::client::Context,
-    msg: Message 
-) {
-    let _ = send_embed(
-        &ctx, 
-        &msg, 
-        "All Sections - Help", 
-        concat!("**R6 Economy Command List**:\n",
-            "- `>>r6 econ analyze <item name | item id>`\n",
-            "- `>>r6 econ graph <item name | item id>`\n",
-            "- `>>r6 econ profit <purchased at> <item name | item id>`\n",
-            "- `>>r6 econ list <(optional) page #>`\n",
-            "- `>>r6 econ transfer <(optional) email> <(optional) password>`\n",
-            "- `>>r6 econ help`\n",
-            "**R6 OPSEC Command List**:\n",
-            "- `>>opsec <pc | xbox | psn> <username>`\n",
-            "- `>>opsec help`\n",
-            "**OSINT Command List**:\n",
-            "- `>>osint email <email>`\n",
-            "- `>>osint username <username>`\n",
-            "- `>>osint password <password>`\n",
-            "- `>>osint name <name>`\n",
-            "- `>>osint hash <hash>`\n",
-            "- `>>osint dehash <hash>`\n",
-            "- `>>osint rehash <password>`\n",
-            "- `>>osint ip <ip>`\n",
-            "- `>>osint last_ip <last ip>`\n",
-            "- `>>osint phone <phone number>`\n",
-            "- `>>osint sherlock <username>`\n",
-            "**Ban Watch Command List**:\n",
-            "- **Still under development, stay cozy...**\n",
-            "**Admin Command List**:\n",
-            "- `>>r6 admin whitelist <section> <user id>`\n",
-            "- `>>r6 admin blacklist <section> <user id>`\n",
-            "- `>>r6 admin help`\n",
-            "\n\n*Developed by @hiibolt on GitHub*"),
-            get_random_anime_girl()
-    ).await
-        .expect("Failed to send embed!");
 }
 
 #[tokio::main]

@@ -1,6 +1,6 @@
 use crate::apis::Ubisoft;
 use crate::helper::{get_random_anime_girl, send_embed_no_return, AsyncFnPtr, BackendHandles, R6RSCommand};
-use crate::{info, Message};
+use crate::{info, startup, Message};
 use serenity::all::{
     CreateMessage,
     CreateEmbed,
@@ -569,6 +569,8 @@ pub async fn build_econ_commands() -> R6RSCommand {
             Some(String::from("econ"))
         )
     );
+
+    startup!("Economy commands have been built.");
 
     econ_nest_command
 }
