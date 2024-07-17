@@ -2,11 +2,11 @@ use crate::apis::get_and_stringify_potential_profiles;
 use crate::helper::send_embed_no_return;
 use crate::helper::AsyncFnPtr;
 use crate::helper::BackendHandles;
+use crate::helper::GenericMessage;
 use crate::helper::R6RSCommand;
 use crate::info;
 use crate::startup;
 use crate::VecDeque;
-use crate::Message;
 use crate::send_embed;
 use crate::Ubisoft;
 use crate::Value;
@@ -105,7 +105,7 @@ fn stringify_profiles(
 async fn linked(
     ubisoft_api: Arc<Mutex<Ubisoft>>,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     args: VecDeque<String>,
     platform: String
 ) -> Result<(), String> {
@@ -138,7 +138,7 @@ async fn linked(
 
     let mut sent = send_embed(
         &ctx, 
-        &msg, 
+        &msg.channel_id, 
         title, 
         &body, 
         &format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png")
@@ -161,7 +161,7 @@ async fn linked(
 async fn applications_helper(
     ubisoft_api: Arc<Mutex<Ubisoft>>,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     args: VecDeque<String>
 ) -> Result<(), String> {
     let mut body = String::new();
@@ -198,7 +198,7 @@ async fn applications_helper(
 
     send_embed_no_return(
         ctx, 
-        msg, 
+        msg.channel_id, 
         title, 
         &body, 
         &format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png")
@@ -252,7 +252,7 @@ fn serialize_applications_response (
 pub async fn lookup_pc(
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     args: VecDeque<String>
 ) -> Result<(), String> {
     tokio::spawn(linked( backend_handles.ubisoft_api, ctx, msg, args, String::from("uplay")));
@@ -262,7 +262,7 @@ pub async fn lookup_pc(
 pub async fn lookup_xbox(
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     args: VecDeque<String>
 ) -> Result<(), String> {
     tokio::spawn(linked( backend_handles.ubisoft_api, ctx, msg, args, String::from("xbl")));
@@ -272,7 +272,7 @@ pub async fn lookup_xbox(
 pub async fn lookup_psn(
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     args: VecDeque<String>
 ) -> Result<(), String> {
     tokio::spawn(linked( backend_handles.ubisoft_api, ctx, msg, args, String::from("psn")));
@@ -282,7 +282,7 @@ pub async fn lookup_psn(
 pub async fn applications(
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     args: VecDeque<String>
 ) -> Result<(), String> {
     applications_helper( backend_handles.ubisoft_api, ctx, msg, args ).await

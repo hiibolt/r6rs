@@ -1,6 +1,6 @@
 use crate::apis::Ubisoft;
-use crate::helper::{get_random_anime_girl, send_embed_no_return, AsyncFnPtr, BackendHandles, R6RSCommand};
-use crate::{info, startup, Message};
+use crate::helper::{get_random_anime_girl, send_embed_no_return, AsyncFnPtr, BackendHandles, GenericMessage, R6RSCommand};
+use crate::{info, startup};
 use serenity::all::{
     CreateMessage,
     CreateEmbed,
@@ -163,7 +163,7 @@ async fn data( state: Arc<Mutex<State>>, args: VecDeque<String> ) -> Result<(Str
 async fn list(
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     mut args: VecDeque<String>
 ) -> Result<(), String> {
     // Get the page number
@@ -183,7 +183,7 @@ async fn list(
 
     send_embed_no_return(
         ctx, 
-        msg, 
+        msg.channel_id, 
         "Tracked Skins", 
         &body, 
         get_random_anime_girl()
@@ -349,7 +349,7 @@ async fn profit_helper(
 pub async fn transfer (
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     mut args: VecDeque<String> 
 ) -> Result<(), String> {
     /* let number_of_items = args.pop_front()
@@ -370,7 +370,7 @@ pub async fn transfer (
             if let Err(err) = temporary_ubisoft_api.lock().await.login().await {
                 send_embed_no_return(
                     ctx, 
-                    msg, 
+                    msg.channel_id, 
                     &format!("R6 - Economy - {} Least Sold Items", number_of_items), 
                     &format!("Failed to get items with an error! Please see below:\n\n{:#?}", err), 
                     get_random_anime_girl()
@@ -386,7 +386,7 @@ pub async fn transfer (
         } else {
             send_embed_no_return(
                 ctx, 
-                msg, 
+                msg.channel_id, 
                 &format!("R6 - Economy - {} Least Sold Items", number_of_items), 
                 "You provided an email, but no password! Please provide both to use the login feature.", 
                 &get_random_anime_girl()
@@ -410,7 +410,7 @@ pub async fn transfer (
     if let Err(err) = items {
         send_embed_no_return(
             ctx, 
-            msg, 
+            msg.channel_id, 
             &format!("R6 - Economy - {} Least Sold Items", number_of_items), 
             &format!("Failed to get items with an error! Please see below:\n\n{:#?}", err), 
             get_random_anime_girl()
@@ -445,7 +445,7 @@ pub async fn transfer (
 
     send_embed_no_return(
         ctx, 
-        msg, 
+        msg.channel_id, 
         &format!("R6 - Economy - {} Least Sold Items", number_of_items), 
         &body, 
         &items.get(0).expect("Unreachable?").asset_url
@@ -457,7 +457,7 @@ pub async fn transfer (
 pub async fn analyze(
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     args: VecDeque<String>
 ) -> Result<(), String> {
     let (body, title, item_img) = data( backend_handles.state, args )
@@ -468,7 +468,7 @@ pub async fn analyze(
     
     send_embed_no_return(
         ctx, 
-        msg, 
+        msg.channel_id, 
         &title, 
         &body, 
         &item_img,
@@ -478,7 +478,7 @@ pub async fn analyze(
 pub async fn graph(
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     args: VecDeque<String>
 ) -> Result<(), String> {
     let item_id = graph_helper( backend_handles.state, args )
@@ -502,14 +502,14 @@ pub async fn graph(
 pub async fn profit(
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     args: VecDeque<String>
 ) -> Result<(), String> {
     let (body, asset_url) = profit_helper( backend_handles.state, args ).await?;
 
     send_embed_no_return(
         ctx, 
-        msg, 
+        msg.channel_id, 
         "Profit Analytics", 
         &body, 
         &asset_url

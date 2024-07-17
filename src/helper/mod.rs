@@ -2,6 +2,8 @@ use crate::apis::BulkVS;
 use crate::apis::Database;
 use crate::apis::Snusbase;
 use crate::apis::Ubisoft;
+use crate::error;
+use crate::info;
 use crate::startup;
 use crate::Message;
 use crate::State;
@@ -10,8 +12,10 @@ use crate::{ Arc, Mutex };
 use crate::read_to_string;
 use std::fs::OpenOptions;
 use std::io::Write;
+use serenity::all::ChannelId;
 use serenity::all::CreateCommand;
 use serenity::all::CreateCommandOption;
+use serenity::all::User;
 use tokio::time::{ sleep, Duration };
 use serenity::model::colour::Colour;
 use serenity::all::EditMessage;
@@ -28,6 +32,12 @@ use colored::Colorize;
 pub mod print;
 
 #[derive(Clone)]
+pub struct GenericMessage {
+    pub channel_id: ChannelId,
+    pub content: String,
+    pub author: User
+}
+#[derive(Clone)]
 pub struct BackendHandles {
     pub ubisoft_api: Arc<Mutex<Ubisoft>>,
     pub snusbase:    Arc<Mutex<Snusbase>>,
@@ -39,7 +49,7 @@ pub struct AsyncFnPtr<R> {
     func: Box<dyn Fn(
         BackendHandles,
         serenity::client::Context,
-        Message,
+        GenericMessage,
         VecDeque<String>
     ) -> BoxFuture<'static, R> + Send + Sync + 'static>
 }
@@ -48,7 +58,7 @@ impl <R> AsyncFnPtr<R> {
         f: fn(
             BackendHandles,
             serenity::client::Context,
-            Message,
+            GenericMessage,
             VecDeque<String>
         ) -> F
     ) -> AsyncFnPtr<F::Output> 
@@ -63,7 +73,7 @@ impl <R> AsyncFnPtr<R> {
         &self,
         backend_handles: BackendHandles,
         ctx: serenity::client::Context,
-        msg: Message,
+        msg: GenericMessage,
         args: VecDeque<String>
     ) -> R { 
         (self.func)(backend_handles, ctx, msg, args).await
@@ -251,7 +261,7 @@ impl R6RSCommand {
         &mut self,
         backend_handles: BackendHandles,
         ctx: serenity::client::Context,
-        msg: Message,
+        msg: GenericMessage,
         mut args: VecDeque<String>
     ) -> Result<()> {
         match &mut self.inner {
@@ -267,7 +277,7 @@ impl R6RSCommand {
 
                     send_embed_no_return(
                         ctx, 
-                        msg, 
+                        msg.channel_id, 
                         "Command Help", 
                         &body, 
                         get_random_anime_girl()
@@ -380,7 +390,7 @@ pub async fn autopull( state: Arc<Mutex<State>> ) {
 }
 pub async fn send_embed_no_return(
     ctx: serenity::client::Context,
-    msg: Message,
+    channel_id: ChannelId,
     title: &str,
     description: &str,
     url: &str
@@ -393,13 +403,13 @@ pub async fn send_embed_no_return(
     
     let builder = CreateMessage::new().embed(embed);
     
-    tokio::spawn(msg.channel_id.send_message(ctx.http, builder));
+    tokio::spawn(channel_id.send_message(ctx.http, builder));
 
     Ok(())
 }
 pub async fn send_embed(
     ctx: &serenity::client::Context,
-    msg: &Message,
+    channel_id: &ChannelId,
     title: &str,
     description: &str,
     url: &str
@@ -412,7 +422,7 @@ pub async fn send_embed(
     
     let builder = CreateMessage::new().embed(embed);
 
-    msg.channel_id.send_message(&ctx.http, builder).await.map_err(|e| format!("{e:?}"))
+    channel_id.send_message(&ctx.http, builder).await.map_err(|e| format!("{e:?}"))
         .map_err(|_| String::from("Failed to send error!s"))
 }
 pub async fn edit_embed(
@@ -431,6 +441,29 @@ pub async fn edit_embed(
 
     msg.edit(ctx, edit_builder).await.unwrap();
 }
+pub async fn dm_to_person (
+    ctx: serenity::all::Context,
+    user_id: serenity::model::id::UserId,
+    message: String
+) -> Result<(), serenity::Error> {
+    let builder: CreateMessage = CreateMessage::new().content(message);
+
+    if let Ok(private_channel) = user_id.create_dm_channel(ctx.clone())
+        .await {
+        let channel_id = &private_channel.id;
+        info!("Channel Id: {channel_id:?}");
+
+        if let Err(e) = private_channel
+            .id
+            .send_message(ctx, builder.clone())
+            .await 
+        {
+            error!("Error sending message to user: {e:?}");
+        }
+    }
+
+    Ok(())
+}
 pub fn get_random_color () -> Colour {
     vec!(
         Colour::FABLED_PINK,
@@ -446,7 +479,7 @@ pub async fn _unimplemented(
 ) {
     send_embed(
         &ctx, 
-        &msg, 
+        &msg.channel_id, 
         "Not yet implemented!", 
         &format!("The command **{cmd}** exists but is not yet implemented! While I work, stay cozy :3"), 
         get_random_anime_girl()
@@ -455,13 +488,13 @@ pub async fn _unimplemented(
 }
 pub async fn no_access(
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     cmd: &str,
     id: u64
 ) {
     send_embed(
         &ctx, 
-        &msg, 
+        &msg.channel_id, 
         "You don't have access to this command!", 
         &format!("You (**@{id}**) aren't authorized to use **{cmd}**.\n\n*Contact @hiibolt to purchase access or if this is in error.*"), 
         get_random_anime_girl()

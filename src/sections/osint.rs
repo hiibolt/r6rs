@@ -1,8 +1,8 @@
 use crate::apis::{is_valid_sherlock_username, Snusbase};
-use crate::helper::{ edit_embed, get_random_anime_girl, send_embed, send_embed_no_return, AsyncFnPtr, BackendHandles, R6RSCommand };
+use crate::helper::{ edit_embed, get_random_anime_girl, send_embed, send_embed_no_return, AsyncFnPtr, BackendHandles, GenericMessage, R6RSCommand };
 use crate::{info, startup};
 
-use serenity::all::{CreateAttachment, CreateMessage, Message};
+use serenity::all::{CreateAttachment, CreateMessage};
 use tokio::sync::Mutex;
 use tungstenite::connect;
 use std::{collections::VecDeque, sync::Arc};
@@ -13,7 +13,7 @@ use colored::Colorize;
 pub async fn lookup( 
     snusbase: Arc<Mutex<Snusbase>>,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     mut args: VecDeque<String>,
     lookup_type: &str
 ) -> Result<(), String> {
@@ -111,7 +111,7 @@ pub async fn lookup(
 
         send_embed_no_return(
             ctx.clone(), 
-            msg.clone(), 
+            msg.channel_id.clone(), 
             "OSINT DUMP", 
             "There were more than 10 results, which in total contains more data than Discord can display.\n\nA full dump will be attached below shortly!", 
             get_random_anime_girl()
@@ -135,7 +135,7 @@ pub async fn lookup(
     if snusbase_response.results.len() == 0 {
         send_embed_no_return(
             ctx.clone(), 
-            msg.clone(), 
+            msg.channel_id.clone(), 
             "No results", 
             "Nothing was found for the given query!\n\n*There were no errors, but there weren't any results either.*", 
             get_random_anime_girl()
@@ -164,7 +164,7 @@ pub async fn lookup(
 
             send_embed_no_return(
                 ctx.clone(), 
-                msg.clone(), 
+                msg.channel_id.clone(), 
                 "OSINT DUMP - Via Email", 
                 &message, 
                 get_random_anime_girl()
@@ -179,7 +179,7 @@ pub async fn lookup(
 pub async fn query_email(
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     args: VecDeque<String>
 ) -> Result<(), String> {
     lookup(backend_handles.snusbase, ctx, msg, args, "email").await
@@ -187,7 +187,7 @@ pub async fn query_email(
 pub async fn query_username(
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     args: VecDeque<String>
 ) -> Result<(), String> {
     lookup(backend_handles.snusbase, ctx, msg, args, "username").await
@@ -195,7 +195,7 @@ pub async fn query_username(
 pub async fn query_last_ip(
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     args: VecDeque<String>
 ) -> Result<(), String> {
     lookup(backend_handles.snusbase, ctx, msg, args, "last_ip").await
@@ -203,7 +203,7 @@ pub async fn query_last_ip(
 pub async fn query_hash(
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     args: VecDeque<String>
 ) -> Result<(), String> {
     lookup(backend_handles.snusbase, ctx, msg, args, "hash").await
@@ -211,7 +211,7 @@ pub async fn query_hash(
 pub async fn query_password(
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     args: VecDeque<String>
 ) -> Result<(), String> {
     lookup(backend_handles.snusbase, ctx, msg, args, "password").await
@@ -219,7 +219,7 @@ pub async fn query_password(
 pub async fn query_name(
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     args: VecDeque<String>
 ) -> Result<(), String> {
     lookup(backend_handles.snusbase, ctx, msg, args, "name").await
@@ -227,7 +227,7 @@ pub async fn query_name(
 pub async fn cnam_lookup(
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     mut args: VecDeque<String>
 ) -> Result<(), String> {
     let phone_number = args.pop_front()
@@ -251,7 +251,7 @@ pub async fn cnam_lookup(
 
     send_embed_no_return(
         ctx, 
-        msg, 
+        msg.channel_id, 
         "CNAM Lookup", 
         &message, 
         get_random_anime_girl()
@@ -263,7 +263,7 @@ pub async fn cnam_lookup(
 async fn geolocate(
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     args: VecDeque<String>
 ) -> Result<(), String> {
     let response = backend_handles.snusbase.lock()
@@ -290,7 +290,7 @@ async fn geolocate(
 
     send_embed_no_return(
         ctx, 
-        msg, 
+        msg.channel_id, 
         "IP Lookup", 
         &message, 
         get_random_anime_girl()
@@ -302,7 +302,7 @@ async fn geolocate(
 pub async fn dehash(
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     args: VecDeque<String>
 ) -> Result<(), String> {
     let response = backend_handles.snusbase.lock()
@@ -331,7 +331,7 @@ pub async fn dehash(
     if total_results > 20 {
         send_embed_no_return(
             ctx.clone(), 
-            msg.clone(), 
+            msg.channel_id.clone(), 
             "OSINT DUMP - `dehash`", 
             "There were more than 20 results, which in total contains more data than Discord can display.\n\nA full dump will be attached below shortly!", 
             get_random_anime_girl()
@@ -353,7 +353,7 @@ pub async fn dehash(
     } else if total_results == 0 {
         send_embed_no_return(
             ctx, 
-            msg, 
+            msg.channel_id, 
             "No results", 
             "There were no errors, but there were also no results!",
             get_random_anime_girl()
@@ -364,7 +364,7 @@ pub async fn dehash(
 
     send_embed_no_return(
         ctx, 
-        msg, 
+        msg.channel_id, 
         "Dehash Results", 
         &body,
         get_random_anime_girl()
@@ -375,7 +375,7 @@ pub async fn dehash(
 pub async fn rehash(
     backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     args: VecDeque<String>
 ) -> Result<(), String> {
     let response = backend_handles.snusbase.lock()
@@ -405,7 +405,7 @@ pub async fn rehash(
     if total_results > 20 {
         send_embed_no_return(
             ctx.clone(), 
-            msg.clone(), 
+            msg.channel_id.clone(), 
             "OSINT DUMP - `rehash`", 
             "There were more than 20 results, which in total contains more data than Discord can display.\n\nA full dump will be attached below shortly!", 
             get_random_anime_girl()
@@ -427,7 +427,7 @@ pub async fn rehash(
     } else if total_results == 0 {
         send_embed_no_return(
             ctx, 
-            msg, 
+            msg.channel_id, 
             "No results", 
             "There were no errors, but there were also no results!",
             get_random_anime_girl()
@@ -438,7 +438,7 @@ pub async fn rehash(
 
     send_embed_no_return(
         ctx, 
-        msg, 
+        msg.channel_id, 
         "Dehash Results", 
         &body,
         get_random_anime_girl()
@@ -450,7 +450,7 @@ pub async fn sherlock_helper(
     username: String,
     
     ctx: serenity::client::Context,
-    msg: Message
+    msg: GenericMessage
 ) {
     let mut body = String::new();
     // Warn the user if the username is poor quality
@@ -462,7 +462,7 @@ pub async fn sherlock_helper(
     let url = get_random_anime_girl();
     let mut base_msg = send_embed(
             &ctx, 
-            &msg, 
+            &msg.channel_id, 
             &title, 
             "Preparing to search...", 
             &url
@@ -525,7 +525,7 @@ pub async fn sherlock_helper(
 pub async fn sherlock(
     _backend_handles: BackendHandles,
     ctx: serenity::client::Context,
-    msg: Message,
+    msg: GenericMessage,
     mut args: VecDeque<String>
 ) -> Result<(), String> {
     let username = args.pop_front()

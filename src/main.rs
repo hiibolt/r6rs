@@ -1,5 +1,4 @@
 mod helper;
-mod commands;
 mod sections;
 mod apis;
 
@@ -12,10 +11,10 @@ use std::{
 };
 
 use apis::database::CommandEntry;
-use helper::{inject_documentation, BackendHandles, R6RSCommand};
+use helper::{inject_documentation, BackendHandles, GenericMessage, R6RSCommand};
 use tokio::sync::Mutex;
 use serde_json::Value;
-use serenity::{all::{ActivityData, ActivityType, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Interaction, OnlineStatus}, async_trait};
+use serenity::{all::{ActivityData, ActivityType, GuildId, Interaction, OnlineStatus, ResolvedValue}, async_trait};
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
@@ -77,13 +76,17 @@ impl EventHandler for Bot {
         if let Err(err) = self.root_command.lock().await.call(
             self.backend_handles.clone(),
             ctx.clone(), 
-            msg.clone(), 
+            GenericMessage {
+                channel_id: msg.channel_id,
+                content: msg.content.clone(),
+                author: msg.author.clone(),
+            }, 
             args
         ).await {
             error!("Failed! [{err}]");
             send_embed(
                 &ctx, 
-                &msg, 
+                &msg.channel_id, 
                 "R6RS - Error", 
                 &format!("Failed for reason:\n\n\"{err}\""), 
                 get_random_anime_girl()
@@ -98,63 +101,71 @@ impl EventHandler for Bot {
     ) {
         if let Interaction::Command(command) = interaction {
             let command_name = &command.data.name;
-            info!("Received command interaction: {command_name}");
 
-            let content = match command.data.name.as_str() {
-                "announce" => {
-                    let response = commands::announce_all::run(
-                            command.data.options(), 
-                            &ctx, 
-                            self.backend_handles.state.clone()
-                        ).await.expect("Failed to run command!");
-                
-                    Some(response)
-                },
-                "announce_opsec" => {
-                    let response = commands::announce_opsec::run(
-                            command.data.options(), 
-                            &ctx, 
-                            self.backend_handles.state.clone()
-                        ).await.expect("Failed to run command!");
-                
-                    Some(response)
-                },
-                "announce_econ" => {
-                    let response = commands::announce_econ::run(
-                            command.data.options(), 
-                            &ctx, 
-                            self.backend_handles.state.clone()
-                        ).await.expect("Failed to run command!");
-                
-                    Some(response)
-                },
-                "announce_osint" => {
-                    let response = commands::announce_osint::run(
-                            command.data.options(), 
-                            &ctx, 
-                            self.backend_handles.state.clone()
-                        ).await.expect("Failed to run command!");
-                
-                    Some(response)
-                },
-                "development" => {
-                    let response = commands::development::run(
-                            command.data.options(), 
-                            &ctx, 
-                            self.backend_handles.ubisoft_api.clone()
-                        ).await.expect("Failed to run command!");
-                
-                    Some(response)
-                },
-                _ => Some("not implemented :(".to_string()),
+            // Convert the slash command back into a standard command
+            let mut args: VecDeque<String> = command_name
+                .split('-')
+                .enumerate()
+                .map(|(ind, st)| {
+                    if ind != 0 {
+                        return st.to_string();
+                    }
+                    format!(">>{st}")
+                })
+                .collect();
+            let mut options: VecDeque<String> = command.data.options()
+                .iter()
+                .map(|opt| {
+                    if let ResolvedValue::String(st) = opt.value {
+                        return st.to_owned();
+                    }
+                    panic!("Somehow recieved an option that wasn't a string!");
+                })
+                .collect();
+            args.append(&mut options);
+
+            // Logging
+            info!("Received command interaction: {command_name} with args {args:?}");
+
+            // Build the message
+            let message = GenericMessage {
+                channel_id: command.channel_id,
+                content: command.data.name.clone(),
+                author: command.member.clone().unwrap().user.clone()
             };
 
-            if let Some(content) = content {
-                let data = CreateInteractionResponseMessage::new().content(content);
-                let builder = CreateInteractionResponse::Message(data);
-                if let Err(why) = command.create_response(&ctx.http, builder).await {
-                    error!("Cannot respond to slash command: {why}");
-                }
+            // Log the slash command to the database
+            let user_id: u64 = command.member.clone().unwrap().user.id.get();
+            let message_id: u64 = command.id.get();
+            let server_id = command.guild_id
+                .and_then(|gid| Some(gid.get()))
+                .unwrap_or(0u64);
+            if let Err(e) = self.backend_handles.database
+                .lock().await
+                .upload_command(CommandEntry { 
+                    message_id,
+                    user_id,
+                    server_id,
+                    command: message.content.clone() + " - [slash command]"
+                }) {
+                warn!("Failed to update DB with reason `{e}`!");
+            }
+
+            // Call the command
+            if let Err(err) = self.root_command.lock().await.call(
+                self.backend_handles.clone(),
+                ctx.clone(), 
+                message, 
+                args
+            ).await {
+                error!("Failed! [{err}]");
+                send_embed(
+                    &ctx, 
+                    &command.channel_id, 
+                    "R6RS - Error", 
+                    &format!("Failed for reason:\n\n\"{err}\""),
+                    get_random_anime_girl()
+                ).await.unwrap();
             }
         }
     }
@@ -165,46 +176,48 @@ impl EventHandler for Bot {
     //
     // In this case, just print what the current user's username is.
     async fn ready(&self, ctx: serenity::client::Context, ready: Ready) {
-        let guild_id = GuildId::new(
-            env::var("GUILD_ID")
-                .expect("Expected GUILD_ID in environment")
-                .parse()
-                .expect("GUILD_ID must be an integer"),
-        );
+        let guild_ids: Vec<GuildId> = env::var("GUILD_ID")
+            .expect("Expected GUILD_ID in environment")
+            .split(',')
+            .map(|st| GuildId::new(st.parse().expect("GUILD_ID must be an integer")))
+            .collect();
+        startup!("Preparing to inject commands into the following guilds: {guild_ids:#?}");
 
-        let mut auto_generated_commands = self.root_command
+        let auto_generated_commands = self.root_command
             .lock().await
             .build_commands("".into())
             .await;
-        let mut all_commands = vec![
-            commands::announce_all::register(),
-            commands::announce_opsec::register(),
-            commands::announce_econ::register(),
-            commands::announce_osint::register(),
-            commands::development::register()
-        ];
-        all_commands.append(&mut auto_generated_commands);
 
-        let commands = match guild_id
-            .set_commands(&ctx.http, all_commands.clone())
-            .await {
-                Ok(commands) => commands,
-                Err(why) => {
-                    for x in 0..all_commands.len() {
-                        let copy = &all_commands[x];
-                        println!("Command {x}:\n{copy:#?}");
+        for guild_id in &guild_ids {
+            let commands = match guild_id
+                .set_commands(&ctx.http, auto_generated_commands.clone())
+                .await {
+                    Ok(commands) => commands,
+                    Err(why) => {
+                        for x in 0..auto_generated_commands.len() {
+                            let copy = &auto_generated_commands[x];
+                            println!("Command {x}:\n{copy:#?}");
+                        }
+
+                        error!("Failed to register commands: {why:#?}");
+                        return;
                     }
+            };
 
-                    error!("Failed to register commands: {why:#?}");
-                    return;
-                }
-        };
+            let command_names = commands
+                .iter()
+                .map(|x| x.name.clone())
+                .collect::<Vec<String>>();
 
-        let command_names = commands
-            .iter()
-            .map(|x| x.name.clone())
-            .collect::<Vec<String>>();
-        startup!("I now have the following guild slash commands: {command_names:#?}");
+            startup!("In server {guild_id:?}, I now have the following guild slash commands: {command_names:#?}");
+            
+            // Wait a second to avoid rate limiting
+            if guild_ids.len() > 1 {
+                startup!("Waiting for 1 second to avoid rate limiting...");
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                startup!("Done!");
+            }
+        }
 
         let bot_name = ready.user.name.clone();
         startup!("Bot \"{bot_name}\" is connected with data!");
