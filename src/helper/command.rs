@@ -100,6 +100,18 @@ impl R6RSCommand {
                         .description(&description);
 
                     for option in &options {
+                        if option == "file" {
+                            command = command.add_option(
+                                CreateCommandOption::new(
+                                    serenity::all::CommandOptionType::Attachment,
+                                    option,
+                                    "File"
+                                )
+                                .required(required));
+
+                            continue;
+                        }
+
                         command = command.add_option(
                             CreateCommandOption::new(
                                 serenity::all::CommandOptionType::String,

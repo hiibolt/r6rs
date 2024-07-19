@@ -8,6 +8,7 @@ use std::collections::HashSet;
 
 use serenity::all::Message;
 use tungstenite::connect;
+use anyhow::{Result, Context};
 
 
 pub async fn get_and_stringify_potential_profiles( 
@@ -18,7 +19,7 @@ pub async fn get_and_stringify_potential_profiles(
     body: &mut String, 
     url: &str,
     allow_all: bool
-) {
+) -> Result<()> {
     let mut invalid_usernames = HashSet::new();
     let mut valid_usernames = HashSet::new();
 
@@ -42,14 +43,14 @@ pub async fn get_and_stringify_potential_profiles(
         let sherlock_ws_url = std::env::var("SHERLOCK_WS_URL")
             .expect("SHERLOCK_WS_URL not set!");
         let (mut socket, response) = connect(&sherlock_ws_url)
-            .expect("Can't connect");
+            .context("Can't connect")?;
         let status = response.status();
 
         info!("Connected to Sherlock API!");
         info!("Response HTTP code: {status}");
 
         socket.send(tungstenite::protocol::Message::Text(format!("{username}")))
-            .expect("Failed to send message to Sherlock API!");
+            .context("Failed to send message to Sherlock API!")?;
 
         // Read messages until the server closes the connection
         let mut found = false;
@@ -106,6 +107,8 @@ pub async fn get_and_stringify_potential_profiles(
             url
         ).await;
     }
+
+    Ok(())
 }
 pub fn is_valid_sherlock_username ( 
     username: &str,

@@ -54,7 +54,8 @@ impl EventHandler for Bot {
         ctx: serenity::client::Context, 
         msg: Message
     ) {
-        let args: VecDeque<String> = msg.content
+        // Extract the command, user, and server IDs
+        let mut args: VecDeque<String> = msg.content
             .clone()
             .split(' ')
             .map(|i| String::from(i))
@@ -65,12 +66,55 @@ impl EventHandler for Bot {
             .and_then(|gid| Some(gid.get()))
             .unwrap_or(0u64);
 
+        // Double check that the message is a command meant for the bot
         let front_arg = args.clone().pop_front().unwrap();
-
         if &front_arg.chars().take(2).collect::<String>() != ">>" {
             return;
         }
 
+        // Convert any attachments to strings and add them to the args
+        for attachment in msg.attachments {
+            // Download the attachment
+            let mut bytes = if let Ok(bytes) = attachment.download().await {
+                bytes
+            } else {
+                error!("Failed to download attachment!");
+                send_embed(
+                    &ctx, 
+                    &msg.channel_id, 
+                    "R6RS - Error", 
+                    &format!("Failed for reason:\n\n\"Could not download your file! Was it too big?\""), 
+                    get_random_anime_girl()
+                ).await.unwrap();
+                return;
+            };
+
+            // Purge any invalid UTF-8 characters
+            bytes = bytes
+                .iter()
+                .filter(|byte| byte.is_ascii())
+                .map(|byte| byte.clone())
+                .collect::<Vec<u8>>();
+
+            let st = match String::from_utf8(bytes) {
+                Ok(st) => st,
+                Err(err) => {
+                    error!("Failed to convert bytes into string! {err:#?}");
+                    send_embed(
+                        &ctx, 
+                        &msg.channel_id, 
+                        "R6RS - Error", 
+                        &format!("Failed for reason:\n\n\"Failed to convert your file to a UTF-8 string! This bot only supports *text* files as arguments :)\""), 
+                        get_random_anime_girl()
+                    ).await.unwrap();
+                    return;
+                }
+            };
+
+            args.push_back(st);
+        }
+
+        // Log the command to the database
         if let Err(e) = self.backend_handles.database
             .lock().await
             .upload_command(CommandEntry { 
@@ -82,9 +126,9 @@ impl EventHandler for Bot {
             warn!("Failed to update DB with reason `{e}`!");
         }
 
+        // Call the command
         let content = &msg.content;
         info!("Received command: {content}");
-        
         if let Err(err) = self.root_command.lock().await.call(
             self.backend_handles.clone(),
             ctx.clone(), 
@@ -125,15 +169,54 @@ impl EventHandler for Bot {
                     format!(">>{st}")
                 })
                 .collect();
-            let mut options: VecDeque<String> = command.data.options()
-                .iter()
-                .map(|opt| {
-                    if let ResolvedValue::String(st) = opt.value {
-                        return st.to_owned();
-                    }
-                    panic!("Somehow recieved an option that wasn't a string!");
-                })
-                .collect();
+            let mut options: VecDeque<String> = VecDeque::new();
+            
+            for opt in command.data.options() {
+                if let ResolvedValue::String(st) = opt.value {
+                    options.push_back(st.to_owned());
+
+                    continue;
+                }
+
+                if let ResolvedValue::Attachment(att) = opt.value {
+                    let bytes = if let Ok(bytes) = att.download().await {
+                        bytes
+                    } else {
+                        // Let the user know you're about to error out
+                        if let Err(why) = command.create_response(
+                            &ctx.http, 
+                            CreateInteractionResponse::Message(
+                                CreateInteractionResponseMessage::new().content("` Failed to download your file! Was it too big? `")
+                            )
+                        ).await {
+                            panic!("Cannot respond to slash command: {why}");
+                        }
+                        panic!("Failed to convert bytes into string!");
+                    };
+
+                    let st = if let Ok(st) = String::from_utf8(bytes) {
+                        st
+                    } else {
+                        // Let the user know you're about to error out
+                        if let Err(why) = command.create_response(
+                            &ctx.http, 
+                            CreateInteractionResponse::Message(
+                                CreateInteractionResponseMessage::new().content("` Failed to convert your file into a string! `")
+                            )
+                        ).await {
+                            panic!("Cannot respond to slash command: {why}");
+                        }
+                        panic!("Failed to convert bytes into string!");
+                    };
+                    
+                    options.push_back(st);
+
+                    continue;
+                }
+
+                panic!("Somehow recieved an option that wasn't a string!");
+            }
+
             args.append(&mut options);
 
             // Logging
