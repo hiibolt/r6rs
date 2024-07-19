@@ -154,12 +154,13 @@ fn stringify_profiles(
         }
     }
 }
-async fn linked(
+async fn linked_helper(
     ubisoft_api: Arc<Mutex<Ubisoft>>,
     ctx: serenity::client::Context,
     msg: GenericMessage,
     args: VecDeque<String>,
-    platform: String
+    platform: String,
+    use_sherlock: bool
 ) -> Result<(), String> {
     let mut body = String::new();
     let title = "OPSEC - Uplay Linked Search";
@@ -197,29 +198,42 @@ async fn linked(
     ).await
         .unwrap();
 
-    body += "## ❔ Potential Profiles\n";
-    if let Err(e) = get_and_stringify_potential_profiles (
-        &usernames,
-        &ctx,
-        &mut sent,
-        title,
-        &mut body,
-        &format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png"),
-        false
-    ).await {
-        body += &format!("Failed to get potential profiles!\n\n{e:#?}");
+    if use_sherlock {
+        body += "## ❔ Potential Profiles\n";
+        if let Err(e) = get_and_stringify_potential_profiles (
+            &usernames,
+            &ctx,
+            &mut sent,
+            title,
+            &mut body,
+            &format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png"),
+            false
+        ).await {
+            body += &format!("Failed to get potential profiles!\n\n{e:#?}");
 
-        warn!("Failed to get potential profiles!\n\n{e:#?}");
+            warn!("Failed to get potential profiles!\n\n{e:#?}");
 
-        send_embed_no_return(
-            ctx, 
-            msg.channel_id, 
-            title, 
-            &body, 
-            &format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png")
-        ).await
-            .unwrap();
+            send_embed_no_return(
+                ctx, 
+                msg.channel_id, 
+                title, 
+                &body, 
+                &format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png")
+            ).await
+                .unwrap();
+        }
     }
+
+    Ok(())
+}
+async fn linked(
+    ubisoft_api: Arc<Mutex<Ubisoft>>,
+    ctx: serenity::client::Context,
+    msg: GenericMessage,
+    args: VecDeque<String>,
+    platform: String
+) -> Result<(), String> {
+    tokio::spawn(linked_helper( ubisoft_api, ctx, msg, args, platform, true ));
 
     Ok(())
 }
@@ -833,7 +847,7 @@ pub async fn mosscheck(
         let mut args = VecDeque::new();
         args.push_back(ubisoft_id.to_string());
         
-        join_handles.push(tokio::spawn(linked( backend_handles.clone().ubisoft_api, ctx.clone(), msg.clone(), args.clone(), String::from("uplay"))));
+        join_handles.push(tokio::spawn(linked_helper( backend_handles.clone().ubisoft_api, ctx.clone(), msg.clone(), args.clone(), String::from("uplay"), false)));
     }
     // Wait for all the `linked` commands to finish
     for handle in join_handles {
