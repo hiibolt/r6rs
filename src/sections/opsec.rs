@@ -802,71 +802,76 @@ pub async fn mosscheck(
             ubisoft_ids.insert(ubisoft_id.as_str());
         }
     }
-
-    // Run both the `recon` and `linked` commands on each Ubisoft ID
-    info!("Extracted the following Ubisoft IDs: {ubisoft_ids:#?}");
-
-    // Start the recon commands
-    send_embed_no_return(
-        ctx.clone(), 
-        msg.channel_id.clone(), 
-        "Step 1/3 - Recon", 
-        "Performing recon for various suspicious flags...", 
-        get_random_anime_girl()
-    ).await
-        .unwrap();
-
-    let mut join_handles = Vec::new();
-    for ubisoft_id in ubisoft_ids.clone() {
-        let mut args = VecDeque::new();
-        args.push_back(ubisoft_id.to_string());
-
-        join_handles.push(tokio::spawn(recon( backend_handles.clone(), ctx.clone(), msg.clone(), args.clone())));
-    }
-    // Wait for all the `recon` commands to finish
-    for handle in join_handles {
-        if let Err(e) = handle.await.map_err(|e| format!("{e:#?}"))? {
-            warn!("Failed to run `recon` command: {e:#?}");
-        };
-    }
-
-
-    // Sleep for 200ms to avoid rate limits
-    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
-    // Start the linked commands
-    send_embed_no_return(
-        ctx.clone(), 
-        msg.channel_id.clone(), 
-        "Step 2/3 - Linking", 
-        "Collecting linked data on all played on accounts...", 
-        get_random_anime_girl()
-    ).await
-        .unwrap();
-    let mut join_handles = Vec::new();
-    for ubisoft_id in ubisoft_ids.clone() {
-        let mut args = VecDeque::new();
-        args.push_back(ubisoft_id.to_string());
-        
-        join_handles.push(tokio::spawn(linked_helper( backend_handles.clone().ubisoft_api, ctx.clone(), msg.clone(), args.clone(), String::from("uplay"), false)));
-    }
-    // Wait for all the `linked` commands to finish
-    for handle in join_handles {
-        if let Err(e) = handle.await.map_err(|e| format!("{e:#?}"))? {
-            warn!("Failed to run `linked` command: {e:#?}");
-        };
-    }
-
-    if ubisoft_ids.len() == 0 {
-        // Warn the user
+    if ubisoft_ids.len() > 0 {
+        // Run both the `recon` and `linked` commands on each Ubisoft ID
+        info!("Extracted the following Ubisoft IDs: {ubisoft_ids:#?}");
+    
+        // Start the recon commands
         send_embed_no_return(
             ctx.clone(), 
             msg.channel_id.clone(), 
-            "No Ubisoft IDs Found!", 
-            "This likely means the user did not launch Siege, or that they have their GameSettings files stored in OneDrive.\n\nIn this case, it is advisable to directly PC check the user - it is not very common for people to do this.", 
+            "Step 1/3 - Recon", 
+            "Performing recon for various suspicious flags...", 
             get_random_anime_girl()
         ).await
             .unwrap();
+    
+        let mut join_handles = Vec::new();
+        for ubisoft_id in ubisoft_ids.clone() {
+            let mut args = VecDeque::new();
+            args.push_back(ubisoft_id.to_string());
+    
+            join_handles.push(tokio::spawn(recon( backend_handles.clone(), ctx.clone(), msg.clone(), args.clone())));
+        }
+        // Wait for all the `recon` commands to finish
+        for handle in join_handles {
+            if let Err(e) = handle.await.map_err(|e| format!("{e:#?}"))? {
+                warn!("Failed to run `recon` command: {e:#?}");
+            };
+        }
+    
+    
+        // Sleep for 200ms to avoid rate limits
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+        // Start the linked commands
+        send_embed_no_return(
+            ctx.clone(), 
+            msg.channel_id.clone(), 
+            "Step 2/3 - Linking", 
+            "Collecting linked data on all played on accounts...", 
+            get_random_anime_girl()
+        ).await
+            .unwrap();
+        let mut join_handles = Vec::new();
+        for ubisoft_id in ubisoft_ids.clone() {
+            let mut args = VecDeque::new();
+            args.push_back(ubisoft_id.to_string());
+            
+            join_handles.push(tokio::spawn(linked_helper( backend_handles.clone().ubisoft_api, ctx.clone(), msg.clone(), args.clone(), String::from("uplay"), false)));
+        }
+        // Wait for all the `linked` commands to finish
+        for handle in join_handles {
+            if let Err(e) = handle.await.map_err(|e| format!("{e:#?}"))? {
+                warn!("Failed to run `linked` command: {e:#?}");
+            };
+        }
+    } else {
+        // Sleep for 200ms to avoid rate limits
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+        if ubisoft_ids.len() == 0 {
+            // Warn the user
+            send_embed_no_return(
+                ctx.clone(), 
+                msg.channel_id.clone(), 
+                "No Ubisoft IDs Found!", 
+                "Skipping steps 1 and 2.\n\nThis likely means the user did not launch Siege, you submitted an invalid MOSS file, or that they have their GameSettings files stored in OneDrive.\n\nIn this case, it is advisable to directly PC check the user - it is not very common for people to do this.", 
+                get_random_anime_girl()
+            ).await
+                .unwrap();
+        }
     }
+
+
 
 
 
