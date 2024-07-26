@@ -116,6 +116,9 @@ impl Sendable {
                     sender.body += &format!(" in {ms_to_complete}ms");
                 }
 
+                // Sleep for a second to let it catch up
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
                 edit_embed(
                     &sender.ctx, 
                     &mut sender.message.clone().ok_or(String::from("No message to edit!"))?, 
