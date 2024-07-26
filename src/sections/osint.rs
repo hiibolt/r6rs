@@ -517,15 +517,11 @@ pub async fn sherlock_helper(
     let title = format!("OSINT - Sherlock - {username}");
     let url = get_random_anime_girl();
     
-    let copied_sendable = sendable.clone();
-    let copied_title = title.clone();
-    tokio::spawn(async move {
-        copied_sendable.lock().await.send(
-            copied_title,
-            "## Results\n".to_string(),
-            url.to_string()
-        ).await.expect("Failed to send to sendable!");
-    });
+    sendable.lock().await.send(
+        title,
+        "## Results\n".to_string(),
+        url.to_string()
+    ).await.expect("Failed to send to sendable!");
     
     // Query Sherlock
     info!("Querying Sherlock for {username}");
@@ -555,12 +551,9 @@ pub async fn sherlock_helper(
 
                 found = true;
 
-                let copied_sendable = sendable.clone();
-                tokio::spawn(async move {
-                    copied_sendable.lock().await.add_line(
-                        format!("{text}")
-                    ).await.expect("Failed to send to sendable!");
-                });
+                sendable.lock().await.add_line(
+                    format!("{text}")
+                ).await.expect("Failed to send to sendable!");
             }
         } else {
             break;

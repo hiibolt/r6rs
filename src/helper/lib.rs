@@ -132,7 +132,7 @@ pub async fn send_embed(
     description: &str,
     url: &str
 ) -> Result<Message, String> {
-    println!("Title: {title}\nDescription: {description}\nURL: {url}");
+    //println!("Title: {title}\nDescription: {description}\nURL: {url}");
 
     let embed = CreateEmbed::new()
         .title(title)

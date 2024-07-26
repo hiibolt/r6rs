@@ -8,7 +8,7 @@ use crate::{
 };
 
 use std::{
-    collections::{HashMap, VecDeque}, env, net::TcpStream, sync::Arc, time::SystemTime
+    collections::{HashMap, VecDeque}, env, net::TcpStream, sync::{atomic::AtomicU16, Arc}, time::SystemTime
 };
 
 use tokio::sync::Mutex;
@@ -39,7 +39,8 @@ pub struct DiscordResponseSender {
     pub channel_id: ChannelId,
     pub author: User,
     pub message: Option<Message>,
-    pub start_time: SystemTime
+    pub start_time: SystemTime,
+    pub ongoing_edits: AtomicU16
 }
 impl Sendable {
     pub async fn send(
@@ -77,7 +78,8 @@ impl Sendable {
     ) -> Result<(), String> {
         match self {
             Sendable::DiscordResponseSender(sender) => {
-                sender.body += &body;
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                sender.ongoing_edits.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
                 let mut tries = 10;
                 while sender.message.is_none() {
@@ -85,10 +87,40 @@ impl Sendable {
                     tries -= 1;
 
                     if tries == 0 {
-                        return Err(String::from("Failed to edit message after 10 tries!"));
+                        return Err(String::from("Message wasn't created even after a full second!"));
                     }
                 }
 
+                for cycle in 1..=10 {
+                    if let Ok(msg) = sender.ctx.http.get_message(
+                        sender.channel_id, 
+                        sender.message.clone().unwrap().id
+                    ).await {
+                        let actual_body = msg
+                            .embeds
+                            .into_iter()
+                            .flat_map(|embed| embed.description)
+                            .collect::<Vec<String>>()
+                            .join("");
+
+                        let edit_number = sender.ongoing_edits.load(std::sync::atomic::Ordering::SeqCst);
+                        if actual_body == sender.body.clone() + "\n\n-# Still working..." {
+                            info!("Safe to complete edit #{edit_number}!");
+
+                            break;
+                        }
+                    }
+
+                    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+
+                    info!("Waiting for edit to complete, {cycle} cycles left...");
+
+                    if cycle == 10 {
+                        warn!("Failed to edit message after 10 tries! Force editing.");
+                    }
+                }
+
+                sender.body += &body;
                 edit_embed(
                     &sender.ctx, 
                     &mut sender.message.clone().expect("Unreachable!"), 
@@ -96,6 +128,7 @@ impl Sendable {
                     &(sender.body.clone() + "\n\n-# Still working..."), 
                     &sender.image
                 ).await;
+                sender.ongoing_edits.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
             },
             _ => {
                 panic!("Invalid sender type!");
@@ -110,15 +143,33 @@ impl Sendable {
     ) -> Result<(), String> {
         match self {
             Sendable::DiscordResponseSender(sender) => {
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+                // Wait for any previous edits
+                for cycle in 1..=10 {
+                    if sender.ongoing_edits.load(std::sync::atomic::Ordering::SeqCst) == 0 {
+                        info!("Safe to finalize!");
+
+                        break;
+                    }
+
+                    tokio::time::sleep(std::time::Duration::from_millis(5000)).await;
+
+                    info!("Waiting for all edits to complete, {cycle} cycles left...");
+
+                    if cycle == 10 {
+                        warn!("Failed to edit message after 10 tries! Force editing.");
+                    }
+                }
+
+                // Add completion notification to body
                 sender.body += "\n\n-# Command completed";
 
                 if let Ok(ms_to_complete) = sender.start_time.elapsed().and_then(|time| Ok(time.as_millis())) {
                     sender.body += &format!(" in {ms_to_complete}ms");
                 }
 
-                // Sleep for a second to let it catch up
-                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-
+                // Edit the message
                 edit_embed(
                     &sender.ctx, 
                     &mut sender.message.clone().ok_or(String::from("No message to edit!"))?, 
@@ -256,7 +307,8 @@ impl EventHandler for Bot {
             channel_id: msg.channel_id,
             author: msg.author.clone(),
             message: None,
-            start_time: SystemTime::now()
+            start_time: SystemTime::now(),
+            ongoing_edits: AtomicU16::new(0)
         })));
         if let Err(err) = self.root_command.lock().await.call(
             self.backend_handles.clone(),
@@ -357,7 +409,8 @@ impl EventHandler for Bot {
                 channel_id: command.channel_id,
                 author: command.member.clone().unwrap().user.clone(),
                 message: None,
-                start_time: SystemTime::now()
+                start_time: SystemTime::now(),
+                ongoing_edits: AtomicU16::new(0)
             });
 
             // Log the slash command to the database
