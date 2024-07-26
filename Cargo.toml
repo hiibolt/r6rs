@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.86"
 async-recursion = "1.1.1"
+axum = "0.7.5"
 base64 = "0.22.0"
 colored = "2.1.0"
 futures = "0.3.30"

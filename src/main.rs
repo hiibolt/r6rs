@@ -3,9 +3,10 @@ mod sections;
 mod apis;
 
 use crate::{
-    helper::lib::{send_embed, inject_documentation},
+    helper::{lib::inject_documentation, command::R6RSCommand},
     apis::{Snusbase, BulkVS, Ubisoft, Database},
     helper::{bot::{Bot, State}, startup::build_root_command, bot::BackendHandles},
+    
 };
 
 use std::{
@@ -15,6 +16,9 @@ use std::{
     sync::Arc
 };
 
+use axum::{extract, routing::post, Router};
+use helper::bot::Sendable;
+use serde::Deserialize;
 use serde_json::Value;
 use serenity::prelude::*;
 use serenity::all::{ActivityData, ActivityType, OnlineStatus};
@@ -22,6 +26,16 @@ use serenity::model::channel::Message;
 use url::Url;
 use anyhow::{Result, Context};
 use colored::Colorize;
+
+#[derive(Debug, Deserialize)]
+struct APIRequest {
+    command: String,
+    args: Vec<String>,
+}
+struct APIState {
+    backend_handles: BackendHandles,
+    root_command: Arc<Mutex<R6RSCommand>>
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -108,14 +122,14 @@ async fn main() -> Result<()> {
     let mut client =
         Client::builder(&token, intents)
         .event_handler(Bot {
-            root_command,
+            root_command: root_command.clone(),
 
             backend_handles: BackendHandles {
-                ubisoft_api,
-                snusbase,
-                bulkvs,
-                database,
-                state
+                ubisoft_api: ubisoft_api.clone(),
+                snusbase: snusbase.clone(),
+                bulkvs: bulkvs.clone(),
+                database: database.clone(),
+                state: state.clone()
             }
         })
         .activity(ActivityData {
@@ -129,9 +143,67 @@ async fn main() -> Result<()> {
         .status(OnlineStatus::DoNotDisturb)
         .await
         .context("Err creating client")?;
-    
-    // Start r6rs
-    client.start().await?;
 
-    Ok(())
+    
+    // Start building the backend API
+    let app = Router::new()
+        .route("/api", post(api_handler))
+        .with_state(Arc::new(Mutex::new(APIState {
+            backend_handles: BackendHandles {
+                ubisoft_api,
+                snusbase,
+                bulkvs,
+                database,
+                state
+            },
+            root_command
+        })));
+
+
+    // Start the Discord Bot
+    daemon!("Starting Discord Bot on seperate thread...");
+    tokio::spawn(async move { 
+        client.start()
+            .await
+            .expect("Failed to start Discord Bot!");
+    });
+        
+    // Start the API
+    let port = env::var("PORT")
+        .context("Could not find PORT in the environment!")?;
+    let listener = tokio::net::TcpListener::bind(&format!("0.0.0.0:{port}"))
+        .await
+        .context("Could not attach TCP listener to port {port}!")?;
+    startup!("Starting API on port {port}!");
+    axum::serve(listener, app).await
+        .context("Error occurred in Axum application!")
+}
+async fn api_handler (
+    extract::State(state): extract::State<Arc<Mutex<APIState>>>,
+    extract::Json(payload): extract::Json<APIRequest>
+) {
+    info!("Incoming API request with the following payload:\n{payload:#?}");
+
+    // Get the command and args
+    let command = payload.command;
+    let mut args = payload.args;
+
+    args.insert(0, command);
+
+    // Run the command
+    let root_command_smart_pointer = &state
+        .lock().await
+        .root_command;
+
+    let mut root_command = root_command_smart_pointer
+        .lock().await;
+
+    let result = root_command
+        .call(
+            state.lock().await.backend_handles.clone(),
+            Arc::new(Mutex::new(Sendable::Other)),
+            VecDeque::from(args)
+        ).await;
+    
+    println!("{result:#?}");
 }

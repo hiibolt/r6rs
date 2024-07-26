@@ -1,8 +1,8 @@
 use crate::{
     apis::{is_valid_sherlock_username, Snusbase},
     helper::{
-        lib::{edit_embed, get_random_anime_girl, send_embed, send_embed_no_return, AsyncFnPtr},
-        bot::{BackendHandles, GenericMessage}, 
+        lib::{get_random_anime_girl, AsyncFnPtr},
+        bot::{BackendHandles, Sendable}, 
         command::R6RSCommand
     },
     info, startup,
@@ -17,8 +17,7 @@ use tungstenite::connect;
 
 pub async fn lookup( 
     snusbase: Arc<Mutex<Snusbase>>,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     mut args: VecDeque<String>,
     lookup_type: &str
 ) -> Result<(), String> {
@@ -114,38 +113,52 @@ pub async fn lookup(
     if number_of_entries > 10 {
         let full_dump = format!("{}", snusbase_response);
 
-        send_embed_no_return(
-            ctx.clone(), 
-            msg.channel_id.clone(), 
-            "OSINT DUMP", 
-            "There were more than 10 results, which in total contains more data than Discord can display.\n\nA full dump will be attached below shortly!", 
-            get_random_anime_girl()
-        ).await
-            .unwrap();
+        let copied_sendable = sendable.clone();
+        tokio::spawn(async move {
+            copied_sendable.lock().await.send(
+                "OSINT DUMP".to_string(),
+                "There were more than 10 results, which in total contains more data than Discord can display.\n\nA full dump will be attached below shortly!".to_string(),
+                get_random_anime_girl().to_string()
+            ).await.expect("Failed to send to sendable!");
+
+            copied_sendable.lock().await
+                .finalize()
+                .await.expect("Failed to finalize message!");
+        });
 
         let builder = CreateMessage::new();
 
-        tokio::spawn(msg.channel_id.send_files(
-            ctx.http,
-            std::iter::once(CreateAttachment::bytes(
-                full_dump.as_bytes(),
-                "full_dump.txt"
-            )),
-            builder
-        ));
+        // This command only works on Discord, for now.
+        let guard = sendable.lock().await;
+        if let Sendable::DiscordResponseSender(ref inner) = *guard {
+            let ctx = inner.ctx.http.clone();
+            tokio::spawn(inner.channel_id.send_files(
+                ctx,
+                std::iter::once(CreateAttachment::bytes(
+                    full_dump.as_bytes(),
+                    "full_dump.txt"
+                )),
+                builder
+            ));
+        } else {
+            todo!();
+        }
 
         return Ok(());
     }
 
     if snusbase_response.results.len() == 0 {
-        send_embed_no_return(
-            ctx.clone(), 
-            msg.channel_id.clone(), 
-            "No results", 
-            "Nothing was found for the given query!\n\n*There were no errors, but there weren't any results either.*", 
-            get_random_anime_girl()
-            ).await
-                .unwrap();
+        tokio::spawn(async move {
+            sendable.lock().await.send(
+                "No results".to_string(),
+                "Nothing was found for the given query!\n\n*There were no errors, but there weren't any results either.*".to_string(),
+                get_random_anime_girl().to_string()
+            ).await.expect("Failed to send to sendable!");
+
+            sendable.lock().await
+                .finalize()
+                .await.expect("Failed to finalize message!");
+        });
         
         return Ok(());
     }
@@ -167,14 +180,19 @@ pub async fn lookup(
             
             message += &format!("\n(From `{}`):\n", dump);
 
-            send_embed_no_return(
-                ctx.clone(), 
-                msg.channel_id.clone(), 
-                "OSINT DUMP - Via Email", 
-                &message, 
-                get_random_anime_girl()
-            ).await
-                .unwrap();
+            
+            let copied_sendable = sendable.clone();
+            tokio::spawn(async move {
+                copied_sendable.lock().await.send(
+                    "OSINT DUMP".to_string(),
+                    message,
+                    get_random_anime_girl().to_string()
+                ).await.expect("Failed to send to sendable!");
+
+                copied_sendable.lock().await
+                    .finalize()
+                    .await.expect("Failed to finalize message!");
+            });
         }
     }
 
@@ -183,56 +201,49 @@ pub async fn lookup(
 
 pub async fn query_email(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
-    lookup(backend_handles.snusbase, ctx, msg, args, "email").await
+    lookup(backend_handles.snusbase, sendable, args, "email").await
 }
 pub async fn query_username(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
-    lookup(backend_handles.snusbase, ctx, msg, args, "username").await
+    lookup(backend_handles.snusbase, sendable, args, "username").await
 }
 pub async fn query_last_ip(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
-    lookup(backend_handles.snusbase, ctx, msg, args, "last_ip").await
+    lookup(backend_handles.snusbase, sendable, args, "last_ip").await
 }
 pub async fn query_hash(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
-    lookup(backend_handles.snusbase, ctx, msg, args, "hash").await
+    lookup(backend_handles.snusbase, sendable, args, "hash").await
 }
 pub async fn query_password(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
-    lookup(backend_handles.snusbase, ctx, msg, args, "password").await
+    lookup(backend_handles.snusbase, sendable, args, "password").await
 }
 pub async fn query_name(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
-    lookup(backend_handles.snusbase, ctx, msg, args, "name").await
+    lookup(backend_handles.snusbase, sendable, args, "name").await
 }
 pub async fn cnam_lookup(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     mut args: VecDeque<String>
 ) -> Result<(), String> {
     let phone_number = args.pop_front()
@@ -254,21 +265,23 @@ pub async fn cnam_lookup(
         message += &format!("\n- **Time**: {time}");
     }
 
-    send_embed_no_return(
-        ctx, 
-        msg.channel_id, 
-        "CNAM Lookup", 
-        &message, 
-        get_random_anime_girl()
-    ).await
-        .unwrap();
+    tokio::spawn(async move {
+        sendable.lock().await.send(
+            "CNAM Lookup".to_string(),
+            message,
+            get_random_anime_girl().to_string()
+        ).await.expect("Failed to send to sendable!");
+
+        sendable.lock().await
+            .finalize()
+            .await.expect("Failed to finalize message!");
+    });
 
     Ok(())
 }
 async fn geolocate(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
     let response = backend_handles.snusbase.lock()
@@ -293,21 +306,23 @@ async fn geolocate(
         }
     }
 
-    send_embed_no_return(
-        ctx, 
-        msg.channel_id, 
-        "IP Lookup", 
-        &message, 
-        get_random_anime_girl()
-    ).await
-        .unwrap();
+    tokio::spawn(async move {
+        sendable.lock().await.send(
+            "IP Lookup".to_string(),
+            message,
+            get_random_anime_girl().to_string()
+        ).await.expect("Failed to send to sendable!");
+
+        sendable.lock().await
+            .finalize()
+            .await.expect("Failed to finalize message!");
+    });
 
     Ok(())
 }
 pub async fn dehash(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
     let response = backend_handles.snusbase.lock()
@@ -334,53 +349,71 @@ pub async fn dehash(
     }
 
     if total_results > 20 {
-        send_embed_no_return(
-            ctx.clone(), 
-            msg.channel_id.clone(), 
-            "OSINT DUMP - `dehash`", 
-            "There were more than 20 results, which in total contains more data than Discord can display.\n\nA full dump will be attached below shortly!", 
-            get_random_anime_girl()
-        ).await
-            .unwrap();
+        let copied_sendable = sendable.clone();
+        tokio::spawn(async move {
+            copied_sendable.lock().await.send(
+                "OSINT DUMP - `dehash`".to_string(),
+                "There were more than 20 results, which in total contains more data than Discord can display.\n\nA full dump will be attached below shortly!".to_string(),
+                get_random_anime_girl().to_string()
+            ).await.expect("Failed to send to sendable!");
+
+            copied_sendable.lock().await
+                .finalize()
+                .await.expect("Failed to finalize message!");
+        });
 
         let builder = CreateMessage::new();
 
-        tokio::spawn(msg.channel_id.send_files(
-            ctx.http,
-            std::iter::once(CreateAttachment::bytes(
-                body.as_bytes(),
-                "full_dump.txt"
-            )),
-            builder
-        ));
+        // This command only works on Discord, for now.
+        let guard = sendable.lock().await;
+        if let Sendable::DiscordResponseSender(ref inner) = *guard {
+            let ctx = inner.ctx.http.clone();
+            tokio::spawn(inner.channel_id.send_files(
+                ctx,
+                std::iter::once(CreateAttachment::bytes(
+                    body.as_bytes(),
+                    "full_dump.txt"
+                )),
+                builder
+            ));
+        } else {
+            todo!();
+        }
 
         return Ok(());
     } else if total_results == 0 {
-        send_embed_no_return(
-            ctx, 
-            msg.channel_id, 
-            "No results", 
-            "There were no errors, but there were also no results!",
-            get_random_anime_girl()
-        ).await.expect("Failed to send message!");
+        tokio::spawn(async move {
+            sendable.lock().await.send(
+                "No results".to_string(),
+                "There were no errors, but there were also no results!".to_string(),
+                get_random_anime_girl().to_string()
+            ).await.expect("Failed to send to sendable!");
+
+            sendable.lock().await
+                .finalize()
+                .await.expect("Failed to finalize message!");
+        });
 
         return Ok(());
     }
 
-    send_embed_no_return(
-        ctx, 
-        msg.channel_id, 
-        "Dehash Results", 
-        &body,
-        get_random_anime_girl()
-    ).await.expect("Failed to send message!");
+    tokio::spawn(async move {
+        sendable.lock().await.send(
+            "Dehash Results".to_string(),
+            body,
+            get_random_anime_girl().to_string()
+        ).await.expect("Failed to send to sendable!");
+
+        sendable.lock().await
+            .finalize()
+            .await.expect("Failed to finalize message!");
+    });
 
     Ok(())
 }
 pub async fn rehash(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
     let response = backend_handles.snusbase.lock()
@@ -408,54 +441,72 @@ pub async fn rehash(
     }
 
     if total_results > 20 {
-        send_embed_no_return(
-            ctx.clone(), 
-            msg.channel_id.clone(), 
-            "OSINT DUMP - `rehash`", 
-            "There were more than 20 results, which in total contains more data than Discord can display.\n\nA full dump will be attached below shortly!", 
-            get_random_anime_girl()
-        ).await
-            .unwrap();
+        let copied_sendable = sendable.clone();
+        tokio::spawn(async move {
+            copied_sendable.lock().await.send(
+                "OSINT DUMP - `rehash`".to_string(),
+                "There were more than 20 results, which in total contains more data than Discord can display.\n\nA full dump will be attached below shortly!".to_string(),
+                get_random_anime_girl().to_string()
+            ).await.expect("Failed to send to sendable!");
+
+            copied_sendable.lock().await
+                .finalize()
+                .await.expect("Failed to finalize message!");
+        });
 
         let builder = CreateMessage::new();
 
-        tokio::spawn(msg.channel_id.send_files(
-            ctx.http,
-            std::iter::once(CreateAttachment::bytes(
-                body.as_bytes(),
-                "full_dump.txt"
-            )),
-            builder
-        ));
+        // This command only works on Discord, for now.
+        let guard = sendable.lock().await;
+        if let Sendable::DiscordResponseSender(ref inner) = *guard {
+            let ctx = inner.ctx.http.clone();
+            tokio::spawn(inner.channel_id.send_files(
+                ctx,
+                std::iter::once(CreateAttachment::bytes(
+                    body.as_bytes(),
+                    "full_dump.txt"
+                )),
+                builder
+            ));
+        } else {
+            todo!();
+        }
 
         return Ok(());
     } else if total_results == 0 {
-        send_embed_no_return(
-            ctx, 
-            msg.channel_id, 
-            "No results", 
-            "There were no errors, but there were also no results!",
-            get_random_anime_girl()
-        ).await.expect("Failed to send message!");
+        tokio::spawn(async move {
+            sendable.lock().await.send(
+                "No results".to_string(),
+                "There were no errors, but there were also no results!".to_string(),
+                get_random_anime_girl().to_string()
+            ).await.expect("Failed to send to sendable!");
+
+            sendable.lock().await
+                .finalize()
+                .await.expect("Failed to finalize message!");
+        });
 
         return Ok(());
     }
 
-    send_embed_no_return(
-        ctx, 
-        msg.channel_id, 
-        "Dehash Results", 
-        &body,
-        get_random_anime_girl()
-    ).await.expect("Failed to send message!");
+    tokio::spawn(async move {
+        sendable.lock().await.send(
+            "Rehash Results".to_string(),
+            body,
+            get_random_anime_girl().to_string()
+        ).await.expect("Failed to send to sendable!");
+
+        sendable.lock().await
+            .finalize()
+            .await.expect("Failed to finalize message!");
+    });
 
     Ok(())
 }
 pub async fn sherlock_helper(
     username: String,
     
-    ctx: serenity::client::Context,
-    msg: GenericMessage
+    sendable: Arc<Mutex<Sendable>>
 ) {
     let mut body = String::new();
     // Warn the user if the username is poor quality
@@ -465,14 +516,16 @@ pub async fn sherlock_helper(
 
     let title = format!("OSINT - Sherlock - {username}");
     let url = get_random_anime_girl();
-    let mut base_msg = send_embed(
-            &ctx, 
-            &msg.channel_id, 
-            &title, 
-            "Preparing to search...", 
-            &url
-        ).await
-            .unwrap();
+    
+    let copied_sendable = sendable.clone();
+    let copied_title = title.clone();
+    tokio::spawn(async move {
+        copied_sendable.lock().await.send(
+            copied_title,
+            "Preparing to search...".to_string(),
+            url.to_string()
+        ).await.expect("Failed to send to sendable!");
+    });
     
     // Query Sherlock
     info!("Querying Sherlock for {username}");
@@ -502,14 +555,12 @@ pub async fn sherlock_helper(
 
                 found = true;
 
-                body += &format!("{text}");            
-                edit_embed(
-                    &ctx,
-                    &mut base_msg,
-                    &title,
-                    &body,
-                    url
-                ).await;
+                let copied_sendable = sendable.clone();
+                tokio::spawn(async move {
+                    copied_sendable.lock().await.add_line(
+                        format!("{text}")
+                    ).await.expect("Failed to send to sendable!");
+                });
             }
         } else {
             break;
@@ -517,26 +568,24 @@ pub async fn sherlock_helper(
     }
 
     if !found {
-        body += &format!("\nNo results found for {username}");
-        edit_embed(
-            &ctx,
-            &mut base_msg,
-            &title,
-            &body,
-            &url
-        ).await;
+        sendable.lock().await.add_line(
+            format!("\nNo results found for {username}")
+        ).await.expect("Failed to send to sendable!");
     }
+
+    sendable.lock().await
+        .finalize()
+        .await.expect("Failed to finalize message!");
 }
 pub async fn sherlock(
     _backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     mut args: VecDeque<String>
 ) -> Result<(), String> {
     let username = args.pop_front()
         .ok_or(String::from("Please provide a username!"))?;
 
-    tokio::spawn(sherlock_helper(username, ctx, msg));
+    tokio::spawn(sherlock_helper(username, sendable));
 
     Ok(())
 }

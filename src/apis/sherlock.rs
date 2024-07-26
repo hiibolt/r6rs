@@ -1,23 +1,20 @@
 use crate::{
-    helper::lib::edit_embed, 
+    helper::bot::Sendable, 
     info,
     Colorize
 };
 
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
-use serenity::all::Message;
+use tokio::sync::Mutex;
 use tungstenite::connect;
-use anyhow::{Result, Context};
+use anyhow::{Result, Context, anyhow};
 
 
 pub async fn get_and_stringify_potential_profiles( 
     usernames: &HashSet<String>, 
-    ctx: &serenity::client::Context, 
-    msg: &mut Message, 
-    title: &str, 
-    body: &mut String, 
-    url: &str,
+    sendable: Arc<Mutex<Sendable>>,
+    body: &mut String,
     allow_all: bool
 ) -> Result<()> {
     let mut invalid_usernames = HashSet::new();
@@ -42,7 +39,10 @@ pub async fn get_and_stringify_potential_profiles(
 
         let sherlock_ws_url = std::env::var("SHERLOCK_WS_URL")
             .expect("SHERLOCK_WS_URL not set!");
-        let (mut socket, response) = connect(&sherlock_ws_url)
+        let (
+            mut socket,
+            response
+        ) = connect(&sherlock_ws_url)
             .context("Can't connect")?;
         let status = response.status();
 
@@ -63,14 +63,10 @@ pub async fn get_and_stringify_potential_profiles(
 
                     found = true;
 
-                    *body += &format!("{text}");            
-                    edit_embed(
-                        &ctx,
-                        msg,
-                        title,
-                        &body,
-                        url
-                    ).await;
+                    sendable.lock().await.add_line(
+                        format!("{text}")
+                    ).await
+                        .map_err(|e| anyhow!("{e:?}"))?;
                 }
             } else {
                 break;
@@ -78,34 +74,28 @@ pub async fn get_and_stringify_potential_profiles(
         }
 
         if !found {
-            *body += &format!("\nNo results found for {username}");
-            edit_embed(
-                &ctx,
-                msg,
-                title,
-                &body,
-                url
-            ).await;
+            sendable.lock().await.add_line(
+                format!("\nNo results found for {username}")
+            ).await
+                .map_err(|e| anyhow!("{e:?}"))?;
         }
     }
     
     if invalid_usernames.len() > 0 {
-        *body += "\n### Ignored Usernames\n";
+        let mut ignored_addendum = String::new();
+        ignored_addendum += "\n### Ignored Usernames\n";
         
-        *body += &invalid_usernames.into_iter()
+        ignored_addendum += &invalid_usernames.into_iter()
             .map(|username| format!("- {username}"))
             .collect::<Vec<String>>()
             .join("\n");
 
-        *body += "\n\nThese usernames would produce poor results from Sherlock. You can always run them manually with the OSINT section :)\n`>>osint sherlock <username>`";
+            ignored_addendum += "\n\nThese usernames would produce poor results from Sherlock. You can always run them manually with the OSINT section :)\n`>>osint sherlock <username>`";
 
-        edit_embed(
-            &ctx,
-            msg,
-            title,
-            &body,
-            url
-        ).await;
+        sendable.lock().await.add_line(
+            ignored_addendum
+        ).await
+            .map_err(|e| anyhow!("{e:?}"))?;
     }
 
     Ok(())

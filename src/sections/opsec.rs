@@ -1,9 +1,9 @@
 use crate::{
     apis::get_and_stringify_potential_profiles, helper::{
-        bot::{BackendHandles, GenericMessage}, command::R6RSCommand, lib::{get_random_anime_girl, send_embed_no_return, AsyncFnPtr}
-    }, info, send_embed, startup, warn, Arc, Colorize, Mutex, Ubisoft, Value, VecDeque
+        bot::{BackendHandles, Sendable}, command::R6RSCommand, lib::{get_random_anime_girl, AsyncFnPtr}
+    }, info, startup, warn, Arc, Colorize, Mutex, Ubisoft, Value, VecDeque
 };
-use regex::Regex;
+//use regex::Regex;
 use scraper::{Html, Selector};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
@@ -56,16 +56,16 @@ struct FindSteamIDBanInfo {
     economyban: String
 }
 #[derive(Deserialize)]
-pub struct GPTResponse {
-    cheating: bool,
-    concrete_evidence: Vec<GPTFlagEntry>
+pub struct _GPTResponse {
+    _cheating: bool,
+    _concrete_evidence: Vec<GPTFlagEntry>
 }
 #[derive(Deserialize)]
 pub struct GPTFlagEntry {
-    line_numbers: String,
-    cheat_type: String,
-    confidence: String,
-    reasoning: String
+    _line_numbers: String,
+    _cheat_type: String,
+    _confidence: String,
+    _reasoning: String
 }
 
 async fn get_profiles(
@@ -156,8 +156,7 @@ fn stringify_profiles(
 }
 async fn linked_helper(
     ubisoft_api: Arc<Mutex<Ubisoft>>,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>,
     platform: String,
     use_sherlock: bool
@@ -189,58 +188,67 @@ async fn linked_helper(
     body += "## ⛓️ Linked Profiles\n";
     stringify_profiles( &profiles, &mut usernames, &mut body, &account_id );
 
-    let mut sent = send_embed(
-        &ctx, 
-        &msg.channel_id, 
-        title, 
-        &body, 
-        &format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png")
-    ).await
-        .unwrap();
-
     if use_sherlock {
         body += "## ❔ Potential Profiles\n";
+    }
+
+    sendable.lock().await.send(
+        title.to_string(),
+        body.clone(),
+        format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png")
+    ).await
+        .expect("Failed to send message!");
+    
+
+    if use_sherlock {
         if let Err(e) = get_and_stringify_potential_profiles (
             &usernames,
-            &ctx,
-            &mut sent,
-            title,
+            sendable.clone(),
             &mut body,
-            &format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png"),
             false
         ).await {
-            body += &format!("Failed to get potential profiles!\n\n{e:#?}");
-
             warn!("Failed to get potential profiles!\n\n{e:#?}");
 
-            send_embed_no_return(
-                ctx, 
-                msg.channel_id, 
-                title, 
-                &body, 
-                &format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png")
+            sendable.lock().await.add_line(
+                format!("Failed to get potential profiles!\n\n{e:#?}"),
             ).await
-                .unwrap();
+                .expect("Failed to send message!");
         }
     }
+
+    sendable.lock().await
+        .finalize()
+        .await.expect("Failed to finalize message!");
 
     Ok(())
 }
 async fn linked(
     ubisoft_api: Arc<Mutex<Ubisoft>>,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>,
     platform: String
 ) -> Result<(), String> {
-    tokio::spawn(linked_helper( ubisoft_api, ctx, msg, args, platform, true ));
+    tokio::spawn(async move {
+        match linked_helper( ubisoft_api, sendable.clone(), args, platform, true ).await {
+            Ok(_) => {},
+            Err(e) => {
+                sendable.lock().await.send(
+                    "Error".to_string(),
+                    e,
+                    get_random_anime_girl().to_string()
+                ).await.expect("Failed to send message!");
+
+                sendable.lock().await.finalize()
+                    .await.expect("Failed to finalize message!");
+            }
+        }
+    });
 
     Ok(())
 }
 async fn applications_helper(
     ubisoft_api: Arc<Mutex<Ubisoft>>,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
     let mut body = String::new();
@@ -275,14 +283,18 @@ async fn applications_helper(
     body += &format!("## 📱 Applications\n\n");
     body += &applications;
 
-    send_embed_no_return(
-        ctx, 
-        msg.channel_id, 
-        title, 
-        &body, 
-        &format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png")
-    ).await
-        .unwrap();
+    tokio::spawn(async move {
+        sendable.lock().await.send(
+            title.to_string(),
+            body,
+            format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png")
+        ).await
+            .expect("Failed to send message!");
+
+        sendable.lock().await
+            .finalize()
+            .await.expect("Failed to finalize message!");
+    });
 
     info!("Result: {res}");
 
@@ -330,41 +342,79 @@ fn serialize_applications_response (
 }
 pub async fn lookup_pc(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
-    tokio::spawn(linked( backend_handles.ubisoft_api, ctx, msg, args, String::from("uplay")));
+    tokio::spawn(async move {
+        match linked( backend_handles.ubisoft_api, sendable.clone(), args, String::from("uplay")).await {
+            Ok(_) => {},
+            Err(e) => {
+                sendable.lock().await.send(
+                    "Error".to_string(),
+                    e,
+                    get_random_anime_girl().to_string()
+                ).await.expect("Failed to send message!");
+
+                sendable.lock().await.finalize()
+                    .await.expect("Failed to finalize message!");
+            }
+        }
+    });
 
     Ok(())
 }
 pub async fn lookup_xbox(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
-    tokio::spawn(linked( backend_handles.ubisoft_api, ctx, msg, args, String::from("xbl")));
+    tokio::spawn(async move {
+        match linked( backend_handles.ubisoft_api, sendable.clone(), args, String::from("xbl")).await {
+            Ok(_) => {},
+            Err(e) => {
+                sendable.lock().await.send(
+                    "Error".to_string(),
+                    e,
+                    get_random_anime_girl().to_string()
+                ).await.expect("Failed to send message!");
 
+                sendable.lock().await.finalize()
+                    .await.expect("Failed to finalize message!");
+            }
+        }
+    });
+    
     Ok(())
 }
 pub async fn lookup_psn(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
-    tokio::spawn(linked( backend_handles.ubisoft_api, ctx, msg, args, String::from("psn")));
+    tokio::spawn(async move {
+        match linked( backend_handles.ubisoft_api, sendable.clone(), args, String::from("psn")).await {
+            Ok(_) => {},
+            Err(e) => {
+                sendable.lock().await.send(
+                    "Error".to_string(),
+                    e,
+                    get_random_anime_girl().to_string()
+                ).await.expect("Failed to send message!");
 
+                sendable.lock().await.finalize()
+                    .await.expect("Failed to finalize message!");
+            }
+        }
+    });
+    
     Ok(())
 }
 pub async fn applications(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
-    applications_helper( backend_handles.ubisoft_api, ctx, msg, args ).await
+    applications_helper( backend_handles.ubisoft_api, sendable, args ).await
 }
 pub fn recon_helper_severity_emoji(
     bad: u8
@@ -621,8 +671,7 @@ pub fn recon_helper_queued_with<'a>(
 }
 pub async fn recon(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
     let title = "OPSEC - Recon";
@@ -733,25 +782,28 @@ pub async fn recon(
     }
 
     // Send the final result
-    send_embed_no_return(
-        ctx.clone(), 
-        msg.channel_id.clone(), 
-        title, 
-        &body.clone(), 
-        &format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png")
-    ).await
-        .unwrap();
+    tokio::spawn(async move {
+        sendable.lock().await.send(
+            title.to_string(), 
+            body.clone(),
+            format!("https://ubisoft-avatars.akamaized.net/{account_id}/default_tall.png")
+        ).await.expect("Failed to send to sendable!");
+            
+        sendable.lock().await
+            .finalize()
+            .await.expect("Failed to finalize message!");
+    });
 
     Ok(())
 }
-pub async fn mosscheck(
+/*
+pub async fn _mosscheck(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
     // Load `assets/logfile.log` into a string
-    let log = args
+    let log: String = args
         .into_iter()
         .collect::<Vec<String>>()
         .join(" ")
@@ -796,10 +848,10 @@ pub async fn mosscheck(
         .expect("Hardcoded regex failed to compile");
 
     // Compile all Ubisoft IDs from the log file
-    let mut ubisoft_ids = HashSet::new();
+    let mut ubisoft_ids: HashSet<String> = HashSet::new();
     for capture in ubisoft_id_re.captures_iter(&log) {
         if let Some(ubisoft_id) = capture.get(2) {
-            ubisoft_ids.insert(ubisoft_id.as_str());
+            ubisoft_ids.insert(ubisoft_id.as_str().to_owned());
         }
     }
     if ubisoft_ids.len() > 0 {
@@ -807,21 +859,26 @@ pub async fn mosscheck(
         info!("Extracted the following Ubisoft IDs: {ubisoft_ids:#?}");
     
         // Start the recon commands
-        send_embed_no_return(
-            ctx.clone(), 
-            msg.channel_id.clone(), 
-            "Step 1/3 - Recon", 
-            "Performing recon for various suspicious flags...", 
-            get_random_anime_girl()
-        ).await
-            .unwrap();
+        let copied_sendable = sendable.clone();
+        let copied_ubisoft_ids = ubisoft_ids.clone();
+        tokio::spawn(async move {
+            copied_sendable.lock().await.send(
+                "Step 1/3 - Recon".to_string(), 
+                format!("Performing recon for various suspicious flags on the following user IDs:\n\n{copied_ubisoft_ids:#?}"),
+                get_random_anime_girl().to_string()
+            ).await.expect("Failed to send to sendable!");
+
+            copied_sendable.lock().await
+                .finalize()
+                .await.expect("Failed to finalize message!");
+        });
     
         let mut join_handles = Vec::new();
         for ubisoft_id in ubisoft_ids.clone() {
             let mut args = VecDeque::new();
             args.push_back(ubisoft_id.to_string());
     
-            join_handles.push(tokio::spawn(recon( backend_handles.clone(), ctx.clone(), msg.clone(), args.clone())));
+            join_handles.push(tokio::spawn(recon( backend_handles.clone(), sendable.clone(), args.clone())));
         }
         // Wait for all the `recon` commands to finish
         for handle in join_handles {
@@ -834,20 +891,24 @@ pub async fn mosscheck(
         // Sleep for 200ms to avoid rate limits
         tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
         // Start the linked commands
-        send_embed_no_return(
-            ctx.clone(), 
-            msg.channel_id.clone(), 
-            "Step 2/3 - Linking", 
-            "Collecting linked data on all played on accounts...", 
-            get_random_anime_girl()
-        ).await
-            .unwrap();
+        let copied_sendable = sendable.clone();
+        tokio::spawn(async move {
+            copied_sendable.lock().await.send(
+                "Step 2/3 - Linking".to_string(), 
+                "Collecting linked data on all played on accounts...".to_string(),
+                get_random_anime_girl().to_string()
+            ).await.expect("Failed to send to sendable!");
+
+            copied_sendable.lock().await
+                .finalize()
+                .await.expect("Failed to finalize message!");
+        });
         let mut join_handles = Vec::new();
         for ubisoft_id in ubisoft_ids.clone() {
             let mut args = VecDeque::new();
             args.push_back(ubisoft_id.to_string());
             
-            join_handles.push(tokio::spawn(linked_helper( backend_handles.clone().ubisoft_api, ctx.clone(), msg.clone(), args.clone(), String::from("uplay"), false)));
+            join_handles.push(tokio::spawn(linked_helper( backend_handles.clone().ubisoft_api, sendable.clone(), args.clone(), String::from("uplay"), false)));
         }
         // Wait for all the `linked` commands to finish
         for handle in join_handles {
@@ -860,14 +921,18 @@ pub async fn mosscheck(
         tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
         if ubisoft_ids.len() == 0 {
             // Warn the user
-            send_embed_no_return(
-                ctx.clone(), 
-                msg.channel_id.clone(), 
-                "No Ubisoft IDs Found!", 
-                "Skipping steps 1 and 2.\n\nThis likely means the user did not launch Siege, you submitted an invalid MOSS file, or that they have their GameSettings files stored in OneDrive.\n\nIn this case, it is advisable to directly PC check the user - it is not very common for people to do this.", 
-                get_random_anime_girl()
-            ).await
-                .unwrap();
+            let copied_sendable = sendable.clone();
+            tokio::spawn(async move {
+                copied_sendable.lock().await.send(
+                    "Step 1/3 - Recon".to_string(), 
+                    "No Ubisoft IDs found in the log file!".to_string(),
+                    get_random_anime_girl().to_string()
+                ).await.expect("Failed to send to sendable!");
+
+                copied_sendable.lock().await
+                    .finalize()
+                    .await.expect("Failed to finalize message!");
+            });
         }
     }
 
@@ -876,14 +941,14 @@ pub async fn mosscheck(
 
 
     // Query GPT-4o for additional insights on the file itself
-    send_embed_no_return(
-        ctx.clone(), 
-        msg.channel_id.clone(), 
-        "Step 3/3 - Recon", 
-        "Analyzing file for suspicious flags...", 
-        get_random_anime_girl()
-    ).await
-        .unwrap();
+    let copied_sendable = sendable.clone();
+    tokio::spawn(async move {
+        copied_sendable.lock().await.send(
+            "Step 3/3 - Recon".to_string(), 
+            "Analyzing file for suspicious flags...".to_string(),
+            get_random_anime_girl().to_string()
+        ).await.expect("Failed to send to sendable!")
+    });
 
     let open_ai_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
     let response = ureq::post("https://api.openai.com/v1/chat/completions")
@@ -928,14 +993,18 @@ pub async fn mosscheck(
             match serde_json::from_value::<GPTResponse>(response) {
                 Ok(response) => {
                     if !response.cheating {
-                        send_embed_no_return(
-                            ctx.clone(), 
-                            msg.channel_id.clone(), 
-                            "GPT-4o Analysis", 
-                            "No cheating was detected in the file.",
-                            get_random_anime_girl()
-                        ).await
-                            .unwrap();
+                        let copied_sendable = sendable.clone();
+                        tokio::spawn(async move {
+                            copied_sendable.lock().await.send(
+                                "GPT-4o Analysis".to_string(), 
+                                "No cheating was detected in the file.".to_string(),
+                                get_random_anime_girl().to_string()
+                            ).await.expect("Failed to send to sendable!");
+
+                            copied_sendable.lock().await
+                                .finalize()
+                                .await.expect("Failed to finalize message!");
+                        });
                     }
         
                     let mut body = response.concrete_evidence.into_iter()
@@ -958,26 +1027,34 @@ pub async fn mosscheck(
                         body += "No definitive proof of cheating was found.\n\nIf you still believe the player is cheating, contact someone knowledgable to manually check them.";
                     }
 
-                    send_embed_no_return(
-                        ctx.clone(), 
-                        msg.channel_id.clone(), 
-                        "Model Analysis", 
-                        &body,
-                        get_random_anime_girl()
-                    ).await
-                        .unwrap();
+                    let copied_sendable = sendable.clone();
+                    tokio::spawn(async move {
+                        copied_sendable.lock().await.send(
+                            "GPT-4o Analysis".to_string(), 
+                            body,
+                            get_random_anime_girl().to_string()
+                        ).await.expect("Failed to send to sendable!");
+
+                        copied_sendable.lock().await
+                            .finalize()
+                            .await.expect("Failed to finalize message!");
+                    });
 
                 },
                 Err(err) => {
-                    send_embed_no_return(
-                        ctx.clone(), 
-                        msg.channel_id.clone(), 
-                        "Model Analysis Failed", 
-                        &format!("{err:#?}"),
-                        get_random_anime_girl()
-                    ).await
-                        .unwrap();
+                    let copied_sendable = sendable.clone();
+                    tokio::spawn(async move {
+                        copied_sendable.lock().await.send(
+                            "GPT-4o Analysis".to_string(), 
+                            format!("Failed to deserialize GPT-4o response.\nError: {err:#?}"),
+                            get_random_anime_girl().to_string()
+                        ).await.expect("Failed to send to sendable!");
 
+                        
+                        copied_sendable.lock().await
+                            .finalize()
+                            .await.expect("Failed to finalize message!");
+                    });
                 }
             }
 
@@ -986,14 +1063,18 @@ pub async fn mosscheck(
         Err(e) => {
             warn!("Failed to query GPT-4o: {e:#?}");
 
-            send_embed_no_return(
-                ctx.clone(), 
-                msg.channel_id.clone(), 
-                "GPT-4o Analysis", 
-                "Failed to query model for additional insights on the file.",
-                get_random_anime_girl()
-            ).await
-                .unwrap();
+            let copied_sendable = sendable.clone();
+            tokio::spawn(async move {
+                copied_sendable.lock().await.send(
+                    "GPT-4o Analysis".to_string(), 
+                    "Failed to query model for additional insights on the file.".to_string(),
+                    get_random_anime_girl().to_string()
+                ).await.expect("Failed to send to sendable!");
+
+                copied_sendable.lock().await
+                    .finalize()
+                    .await.expect("Failed to finalize message!");
+            });
         }
     }
 
@@ -1002,17 +1083,22 @@ pub async fn mosscheck(
     // Sleep for 200ms to avoid rate limits
     tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
     // Send the final result
-    send_embed_no_return(
-        ctx.clone(), 
-        msg.channel_id.clone(), 
-        "Done!", 
-        "Automatic MOSS check complete.", 
-        get_random_anime_girl()
-    ).await
-        .unwrap();
+    tokio::spawn(async move {
+        sendable.lock().await.send(
+            "Done!".to_string(), 
+            "Automatic MOSS check complete.".to_string(),
+            get_random_anime_girl().to_string()
+        ).await.expect("Failed to send to sendable!");
+
+        
+        sendable.lock().await
+            .finalize()
+            .await.expect("Failed to finalize message!");
+    });
 
     Ok(())
 }
+*/
 
 pub async fn build_opsec_commands() -> R6RSCommand {
     let mut opsec_nest_command = R6RSCommand::new_root(
@@ -1064,7 +1150,8 @@ pub async fn build_opsec_commands() -> R6RSCommand {
             Some(String::from("opsec"))
         )
     );
-    opsec_nest_command.attach(
+    
+    /*opsec_nest_command.attach(
         String::from("mosscheck"),
         R6RSCommand::new_leaf(
             String::from("Runs a complete suspicion check on a provided MOSS file."),
@@ -1072,7 +1159,7 @@ pub async fn build_opsec_commands() -> R6RSCommand {
             vec!(vec!(String::from("file"))),
             Some(String::from("opsec"))
         )
-    );
+    );*/
 
     startup!("OPSEC commands have been built.");
 

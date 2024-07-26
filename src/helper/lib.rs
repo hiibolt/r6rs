@@ -1,4 +1,4 @@
-use super::bot::{BackendHandles, GenericMessage};
+use super::bot::{BackendHandles, Sendable};
 use crate::{
     error, info, startup, daemon,
     Message, State,
@@ -25,8 +25,7 @@ use serenity::{
 pub struct AsyncFnPtr<R> {
     func: Box<dyn Fn(
         BackendHandles,
-        serenity::client::Context,
-        GenericMessage,
+        Arc<Mutex<Sendable>>,
         VecDeque<String>
     ) -> BoxFuture<'static, R> + Send + Sync + 'static>
 }
@@ -34,8 +33,7 @@ impl <R> AsyncFnPtr<R> {
     pub fn new<F>(
         f: fn(
             BackendHandles,
-            serenity::client::Context,
-            GenericMessage,
+            Arc<Mutex<Sendable>>,
             VecDeque<String>
         ) -> F
     ) -> AsyncFnPtr<F::Output> 
@@ -43,17 +41,16 @@ impl <R> AsyncFnPtr<R> {
         F: Future<Output = R> + Send + Sync + 'static
     {
         AsyncFnPtr {
-            func: Box::new(move |backend_handles, ctx, msg, args| Box::pin(f(backend_handles, ctx, msg, args))),
+            func: Box::new(move |backend_handles, sendable, args| Box::pin(f(backend_handles, sendable, args))),
         }
     }
     pub async fn run(
         &self,
         backend_handles: BackendHandles,
-        ctx: serenity::client::Context,
-        msg: GenericMessage,
+        sendable: Arc<Mutex<Sendable>>,
         args: VecDeque<String>
     ) -> R { 
-        (self.func)(backend_handles, ctx, msg, args).await
+        (self.func)(backend_handles, sendable, args).await
     }
 }
 
@@ -128,25 +125,6 @@ pub async fn autopull( state: Arc<Mutex<State>> ) {
         sleep(Duration::from_secs(60)).await;
     }
 }
-pub async fn send_embed_no_return(
-    ctx: serenity::client::Context,
-    channel_id: ChannelId,
-    title: &str,
-    description: &str,
-    url: &str
-) -> Result<()> {
-    let embed = CreateEmbed::new()
-        .title(title)
-        .description(description)
-        .color(get_random_color())
-        .thumbnail(url);
-    
-    let builder = CreateMessage::new().embed(embed);
-    
-    tokio::spawn(channel_id.send_message(ctx.http, builder));
-
-    Ok(())
-}
 pub async fn send_embed(
     ctx: &serenity::client::Context,
     channel_id: &ChannelId,
@@ -154,6 +132,8 @@ pub async fn send_embed(
     description: &str,
     url: &str
 ) -> Result<Message, String> {
+    println!("Title: {title}\nDescription: {description}\nURL: {url}");
+
     let embed = CreateEmbed::new()
         .title(title)
         .description(description)
@@ -163,7 +143,7 @@ pub async fn send_embed(
     let builder = CreateMessage::new().embed(embed);
 
     channel_id.send_message(&ctx.http, builder).await.map_err(|e| format!("{e:?}"))
-        .map_err(|_| String::from("Failed to send error!s"))
+        .map_err(|e| format!("Failed to send embed!\n\n{e:?}"))
 }
 pub async fn edit_embed(
     ctx: &serenity::client::Context,
@@ -226,6 +206,7 @@ pub async fn _unimplemented(
     ).await
         .unwrap();
 }
+/*
 pub async fn no_access(
     ctx: serenity::client::Context,
     msg: GenericMessage,
@@ -240,7 +221,7 @@ pub async fn no_access(
         get_random_anime_girl()
     ).await
         .unwrap();
-}
+} */
 pub fn get_random_anime_girl() -> &'static str {
     [
         "https://github.com/hiibolt/hiibolt/assets/91273156/4a7c1e36-bf24-4f5a-a501-4dc9c92514c4",

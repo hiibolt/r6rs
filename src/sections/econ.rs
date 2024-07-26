@@ -1,8 +1,8 @@
 use crate::{
     apis::Ubisoft,
     helper::{
-        lib::{get_random_anime_girl, send_embed_no_return, AsyncFnPtr}, 
-        bot::{BackendHandles, State, GenericMessage}, 
+        lib::{get_random_anime_girl, AsyncFnPtr}, 
+        bot::{BackendHandles, State, Sendable}, 
         command::R6RSCommand
     },
     info, startup,
@@ -16,6 +16,7 @@ use std::time::{
     UNIX_EPOCH
 };
 
+use anyhow::anyhow;
 use serenity::all::{
     CreateMessage,
     CreateEmbed,
@@ -165,8 +166,7 @@ async fn data( state: Arc<Mutex<State>>, args: VecDeque<String> ) -> Result<(Str
 }
 async fn list(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     mut args: VecDeque<String>
 ) -> Result<(), String> {
     // Get the page number
@@ -184,14 +184,17 @@ async fn list(
         body += &format!("{key}\n");
     }
 
-    send_embed_no_return(
-        ctx, 
-        msg.channel_id, 
-        "Tracked Skins", 
-        &body, 
-        get_random_anime_girl()
-    ).await
-        .unwrap();
+    tokio::spawn(async move {
+        sendable.lock().await.send(
+            "Tracked Skins".to_string(),
+            body,
+            get_random_anime_girl().to_string()
+        ).await.map_err(|e| anyhow!("Failed to send embed!\n\n{e:#?}")).unwrap();
+        
+        sendable.lock()
+            .await.finalize()
+            .await.map_err(|e| anyhow!("Failed to finalize message!\n\n{e:#?}")).unwrap();
+    });
 
     Ok(())
 }
@@ -351,8 +354,7 @@ async fn profit_helper(
 }
 pub async fn transfer (
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     mut args: VecDeque<String> 
 ) -> Result<(), String> {
     /* let number_of_items = args.pop_front()
@@ -371,14 +373,18 @@ pub async fn transfer (
             let temporary_ubisoft_api = Arc::new(Mutex::new(Ubisoft::new(email, password)));
 
             if let Err(err) = temporary_ubisoft_api.lock().await.login().await {
-                send_embed_no_return(
-                    ctx, 
-                    msg.channel_id, 
-                    &format!("R6 - Economy - {} Least Sold Items", number_of_items), 
-                    &format!("Failed to get items with an error! Please see below:\n\n{:#?}", err), 
-                    get_random_anime_girl()
-                ).await
-                    .expect("Failed to send embed!");
+                tokio::spawn(async move { 
+                    sendable.lock().await.send(
+                        "R6 - Economy - Least Sold Items".to_string(),
+                        format!("Failed to login with an error! Please see below:\n\n{:#?}", err),
+                        get_random_anime_girl().to_string()
+                    ).await
+                        .expect("Failed to send embed!");
+
+                    sendable.lock()
+                        .await.finalize()
+                        .await.map_err(|e| anyhow!("Failed to finalize message!\n\n{e:#?}")).unwrap();
+                });
         
                 return Ok(());
             }
@@ -387,14 +393,18 @@ pub async fn transfer (
 
             used_login = true;
         } else {
-            send_embed_no_return(
-                ctx, 
-                msg.channel_id, 
-                &format!("R6 - Economy - {} Least Sold Items", number_of_items), 
-                "You provided an email, but no password! Please provide both to use the login feature.", 
-                &get_random_anime_girl()
-            ).await
-                .expect("Failed to send embed!");
+            tokio::spawn(async move { 
+                sendable.lock().await.send(
+                    "R6 - Economy - Least Sold Items".to_string(),
+                    "You provided an email, but no password! Please provide both to use the login feature.".to_string(),
+                    get_random_anime_girl().to_string()
+                ).await
+                    .expect("Failed to send embed!");
+
+                sendable.lock()
+                    .await.finalize()
+                    .await.map_err(|e| anyhow!("Failed to finalize message!\n\n{e:#?}")).unwrap();
+            });
 
             return Ok(());
         }
@@ -411,14 +421,18 @@ pub async fn transfer (
     };
 
     if let Err(err) = items {
-        send_embed_no_return(
-            ctx, 
-            msg.channel_id, 
-            &format!("R6 - Economy - {} Least Sold Items", number_of_items), 
-            &format!("Failed to get items with an error! Please see below:\n\n{:#?}", err), 
-            get_random_anime_girl()
-        ).await
-            .expect("Failed to send embed!");
+        tokio::spawn(async move {
+            sendable.lock().await.send(
+                "R6 - Economy - Least Sold Items".to_string(),
+                format!("Failed to get items with an error! Please see below:\n\n{:#?}", err),
+                get_random_anime_girl().to_string()
+            ).await
+                .expect("Failed to send embed!");
+
+            sendable.lock()
+                .await.finalize()
+                .await.map_err(|e| anyhow!("Failed to finalize message!\n\n{e:#?}")).unwrap();
+        });
 
         return Ok(());
     }
@@ -446,21 +460,24 @@ pub async fn transfer (
         body.push_str("\n\nData is global, and gathered using an arbitrary Ubisoft account.");
     }
 
-    send_embed_no_return(
-        ctx, 
-        msg.channel_id, 
-        &format!("R6 - Economy - {} Least Sold Items", number_of_items), 
-        &body, 
-        &items.get(0).expect("Unreachable?").asset_url
-    ).await
-        .expect("Failed to send embed!");
+    tokio::spawn(async move {
+        sendable.lock().await.send(
+            "R6 - Economy - Least Sold Items".to_string(),
+            body,
+            items.get(0).expect("Unreachable?").asset_url.to_owned()
+        ).await
+            .expect("Failed to send embed!");
+
+        sendable.lock()
+            .await.finalize()
+            .await.map_err(|e| anyhow!("Failed to finalize message!\n\n{e:#?}")).unwrap();
+    });
 
     Ok(())
 }
 pub async fn analyze(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
     let (body, title, item_img) = data( backend_handles.state, args )
@@ -469,19 +486,23 @@ pub async fn analyze(
             (err, String::from("Error!"), String::from(get_random_anime_girl()))
         );
     
-    send_embed_no_return(
-        ctx, 
-        msg.channel_id, 
-        &title, 
-        &body, 
-        &item_img,
-    ).await
-        .map_err(|e| format!("{e:#?}"))
+    tokio::spawn(async move {
+        sendable.lock().await.send(
+            title,
+            body,
+            item_img
+        ).await.expect("Failed to send embed!");
+
+        sendable.lock()
+            .await.finalize()
+            .await.map_err(|e| anyhow!("Failed to finalize message!\n\n{e:#?}")).unwrap();
+    });
+    
+    Ok(())
 }
 pub async fn graph(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
     let item_id = graph_helper( backend_handles.state, args )
@@ -498,27 +519,44 @@ pub async fn graph(
         .embed(embed)
         .add_file(attachment);
 
-    tokio::spawn(msg.channel_id.send_message(ctx.http, builder));
+    // This command only works with Discord, for now.
+    let guard = sendable.lock().await;
+    if let Sendable::DiscordResponseSender(ref inner) = *guard {
+        // Send the image
+        let ctx = inner.ctx.clone();
+        tokio::spawn(inner.channel_id.send_message(ctx, builder));
+    } else {
+        return Err(String::from("This command can only be used in Discord!"));
+    }
+    drop(guard); // writing this line invoked pure euphoric bliss ^v^
+
+    tokio::spawn(async move {
+        sendable.lock().await
+            .finalize()
+            .await.map_err(|e| anyhow!("Failed to finalize message!\n\n{e:#?}")).unwrap();
+    });
 
     Ok(())
 }
 pub async fn profit(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
     let (body, asset_url) = profit_helper( backend_handles.state, args ).await?;
 
-    send_embed_no_return(
-        ctx, 
-        msg.channel_id, 
-        "Profit Analytics", 
-        &body, 
-        &asset_url
-    ).await
-        .expect("Failed to send embed!");
-    
+    tokio::spawn(async move {
+        sendable.lock().await.send(
+            "R6 - Economy - Profit Analysis".to_string(),
+            body,
+            asset_url
+        ).await.expect("Failed to send embed!");
+        
+        sendable.lock()
+            .await.finalize()
+            .await.map_err(|e| anyhow!("Failed to finalize message!\n\n{e:#?}")).unwrap();
+    });
+
     Ok(())
 }
 

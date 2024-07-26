@@ -1,6 +1,6 @@
 use super::{
     command::R6RSCommand,
-    lib::{ get_random_anime_girl, send_embed }
+    lib::{ edit_embed, get_random_anime_girl, send_embed }
 };
 use crate::{
     apis::{BulkVS, Database, Snusbase, Ubisoft, database::CommandEntry}, 
@@ -8,9 +8,7 @@ use crate::{
 };
 
 use std::{
-    collections::{VecDeque, HashMap}, 
-    env,
-    sync::Arc
+    collections::{HashMap, VecDeque}, env, net::TcpStream, sync::Arc, time::SystemTime
 };
 
 use tokio::sync::Mutex;
@@ -20,14 +18,122 @@ use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 use colored::Colorize;
+use tungstenite::{stream::MaybeTlsStream, WebSocket};
 
-
-#[derive(Clone)]
-pub struct GenericMessage {
-    pub channel_id: ChannelId,
-    pub content: String,
-    pub author: User
+pub enum Sendable {
+    DiscordResponseSender(DiscordResponseSender),
+    _WebAPIResponseSender(WebAPIResponseSender),
+    Other
 }
+pub struct WebAPIResponseSender {
+    pub _title: String,
+    pub _body: String,
+    pub _image: String,
+    pub _socket_sender: WebSocket<MaybeTlsStream<TcpStream>>
+}
+pub struct DiscordResponseSender {
+    pub ctx: serenity::client::Context,
+    pub title: String,
+    pub body: String,
+    pub image: String,
+    pub channel_id: ChannelId,
+    pub author: User,
+    pub message: Option<Message>,
+    pub start_time: SystemTime
+}
+impl Sendable {
+    pub async fn send(
+        &mut self,
+        title: String,
+        body: String,
+        image: String
+    ) -> Result<(), String> {
+        match self {
+            Sendable::DiscordResponseSender(sender) => {
+                sender.title = title;
+                sender.body = body;
+                sender.image = image;
+
+                sender.message = Some(send_embed(
+                    &sender.ctx, 
+                    &sender.channel_id, 
+                    &sender.title, 
+                    &(sender.body.clone() + "\n\n-# Still working..."), 
+                    &sender.image
+                ).await
+                    .map_err(|e| format!("Failed to send message!\n\n{e:?}"))?);
+            },
+            _ => {
+                panic!("Invalid sender type!");
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn add_line(
+        &mut self,
+        body: String
+    ) -> Result<(), String> {
+        match self {
+            Sendable::DiscordResponseSender(sender) => {
+                sender.body += &body;
+
+                let mut tries = 10;
+                while sender.message.is_none() {
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    tries -= 1;
+
+                    if tries == 0 {
+                        return Err(String::from("Failed to edit message after 10 tries!"));
+                    }
+                }
+
+                edit_embed(
+                    &sender.ctx, 
+                    &mut sender.message.clone().expect("Unreachable!"), 
+                    &sender.title, 
+                    &(sender.body.clone() + "\n\n-# Still working..."), 
+                    &sender.image
+                ).await;
+            },
+            _ => {
+                panic!("Invalid sender type!");
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn finalize(
+        &mut self
+    ) -> Result<(), String> {
+        match self {
+            Sendable::DiscordResponseSender(sender) => {
+                sender.body += "\n\n-# Command completed";
+
+                if let Ok(ms_to_complete) = sender.start_time.elapsed().and_then(|time| Ok(time.as_millis())) {
+                    sender.body += &format!(" in {ms_to_complete}ms");
+                }
+
+                edit_embed(
+                    &sender.ctx, 
+                    &mut sender.message.clone().ok_or(String::from("No message to edit!"))?, 
+                    &sender.title, 
+                    &sender.body, 
+                    &sender.image
+                ).await;
+            },
+            _ => {
+                panic!("Invalid sender type!");
+            }
+        }
+
+        Ok(())
+    }
+}
+
+
 #[derive(Clone)]
 pub struct BackendHandles {
     pub ubisoft_api: Arc<Mutex<Ubisoft>>,
@@ -67,8 +173,18 @@ impl EventHandler for Bot {
             .unwrap_or(0u64);
 
         // Double check that the message is a command meant for the bot
-        let front_arg = args.clone().pop_front().unwrap();
-        if &front_arg.chars().take(2).collect::<String>() != ">>" {
+        if let Ok(val) = std::env::var("DEV_MODE") {
+            if val == "true" {
+                if args[0].chars().take(3).collect::<String>() != "dev" {
+                    if &args[0].chars().take(2).collect::<String>() == ">>" {
+                        warn!("Got standard command, but you're in dev mode!");
+                    }
+                    return;
+                }
+                args[0] = args[0].chars().skip(3).collect();
+            }
+        }       
+        if &args[0].chars().take(2).collect::<String>() != ">>" {
             return;
         }
 
@@ -83,7 +199,7 @@ impl EventHandler for Bot {
                     &ctx, 
                     &msg.channel_id, 
                     "R6RS - Error", 
-                    &format!("Failed for reason:\n\n\"Could not download your file! Was it too big?\""), 
+                    &format!("Failed for reason:\n\nCould not download your file! Was it too big?"), 
                     get_random_anime_girl()
                 ).await.unwrap();
                 return;
@@ -104,7 +220,7 @@ impl EventHandler for Bot {
                         &ctx, 
                         &msg.channel_id, 
                         "R6RS - Error", 
-                        &format!("Failed for reason:\n\n\"Failed to convert your file to a UTF-8 string! This bot only supports *text* files as arguments :)\""), 
+                        &format!("Failed for reason:\n\nFailed to convert your file to a UTF-8 string! This bot only supports *text* files as arguments :)"), 
                         get_random_anime_girl()
                     ).await.unwrap();
                     return;
@@ -129,24 +245,31 @@ impl EventHandler for Bot {
         // Call the command
         let content = &msg.content;
         info!("Received command: {content}");
+        let sendable = Arc::new(Mutex::new(Sendable::DiscordResponseSender(DiscordResponseSender {
+            ctx: ctx.clone(),
+            title: String::new(),
+            body: String::new(),
+            image: String::new(),
+            channel_id: msg.channel_id,
+            author: msg.author.clone(),
+            message: None,
+            start_time: SystemTime::now()
+        })));
         if let Err(err) = self.root_command.lock().await.call(
             self.backend_handles.clone(),
-            ctx.clone(), 
-            GenericMessage {
-                channel_id: msg.channel_id,
-                content: msg.content.clone(),
-                author: msg.author.clone(),
-            }, 
+            sendable.clone(),
             args
         ).await {
             error!("Failed! [{err}]");
-            send_embed(
-                &ctx, 
-                &msg.channel_id, 
-                "R6RS - Error", 
-                &format!("Failed for reason:\n\n\"{err}\""), 
-                get_random_anime_girl()
-            ).await.unwrap();
+            sendable.lock().await.send(
+                "R6RS - Error".to_string(),
+                format!("Failed for reason:\n\n{err}").to_string(),
+                get_random_anime_girl().to_string()
+            ).await
+                .expect("Failed to send message!");
+            sendable.lock().await
+                .finalize()
+                .await.expect("Failed to finalize message!");
         }
     }
 
@@ -223,11 +346,16 @@ impl EventHandler for Bot {
             info!("Received command interaction: {command_name} with args {args:?}");
 
             // Build the message
-            let message = GenericMessage {
+            let sendable = Sendable::DiscordResponseSender(DiscordResponseSender {
+                ctx: ctx.clone(),
+                title: String::new(),
+                body: String::new(),
+                image: String::new(),
                 channel_id: command.channel_id,
-                content: command.data.name.clone(),
-                author: command.member.clone().unwrap().user.clone()
-            };
+                author: command.member.clone().unwrap().user.clone(),
+                message: None,
+                start_time: SystemTime::now()
+            });
 
             // Log the slash command to the database
             let user_id: u64 = command.member.clone().unwrap().user.id.get();
@@ -241,7 +369,7 @@ impl EventHandler for Bot {
                     message_id,
                     user_id,
                     server_id,
-                    command: message.content.clone() + " - [slash command]"
+                    command: command.data.name.clone() + " - [slash command]"
                 }) {
                 warn!("Failed to update DB with reason `{e}`!");
             }
@@ -259,8 +387,7 @@ impl EventHandler for Bot {
             // Call the command
             if let Err(err) = self.root_command.lock().await.call(
                 self.backend_handles.clone(),
-                ctx.clone(), 
-                message, 
+                Arc::new(Mutex::new(sendable)),
                 args
             ).await {
                 error!("Failed! [{err}]");
@@ -268,7 +395,7 @@ impl EventHandler for Bot {
                     &ctx, 
                     &command.channel_id, 
                     "R6RS - Error", 
-                    &format!("Failed for reason:\n\n\"{err}\""),
+                    &format!("Failed for reason:\n\n{err}"),
                     get_random_anime_girl()
                 ).await.unwrap();
             }

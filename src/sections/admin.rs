@@ -1,17 +1,18 @@
+use tokio::sync::Mutex;
+
 use crate::{
-    helper::bot::{BackendHandles, GenericMessage},
-    helper::lib::{dm_to_person, get_random_anime_girl, send_embed_no_return, AsyncFnPtr, save},
+    helper::bot::{BackendHandles, Sendable},
+    helper::lib::{dm_to_person, get_random_anime_girl, AsyncFnPtr, save},
     helper::command::R6RSCommand,
     info, startup, VecDeque,
     Colorize,
 };
 
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 pub async fn whitelist(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     mut args: VecDeque<String>
 ) -> Result<(), String> {
     // Get the input
@@ -35,21 +36,23 @@ pub async fn whitelist(
     // Save
     save( backend_handles.state ).await;
 
-    send_embed_no_return(
-        ctx, 
-        msg.channel_id, 
-        "Admin - Whitelist Success", 
-        &format!("Successfully added person to section!"), 
-        get_random_anime_girl()
-    ).await
-        .map_err(|e| format!("{e:?}"))?;
+    tokio::spawn(async move {
+        sendable.lock().await.send(
+            "Admin - Whitelist Success".to_string(),
+            format!("Successfully added {user_id} to section!"),
+            get_random_anime_girl().to_string()
+        ).await
+            .expect("Failed to send message!");
+
+        sendable.lock().await.finalize()
+            .await.expect("Failed to finalize message!");
+    });
 
     Ok(())
 }
 pub async fn blacklist(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     mut args: VecDeque<String>
 ) -> Result<(), String> {
     // Get the input
@@ -82,20 +85,23 @@ pub async fn blacklist(
     // Save
     save( backend_handles.state ).await;
 
-    send_embed_no_return(
-        ctx, 
-        msg.channel_id, 
-        "Success", 
-        &format!("Successfully removed person from section, if they existed!"), 
-        get_random_anime_girl()
-    ).await.unwrap();
+    tokio::spawn(async move {
+        sendable.lock().await.send(
+        "Admin - Blacklist Success".to_string(),
+        format!("Successfully removed {user_id} from section!"),
+        get_random_anime_girl().to_string()
+        ).await
+            .expect("Failed to send message!");
+
+        sendable.lock().await.finalize()
+            .await.expect("Failed to finalize message!");
+    });
 
     Ok(())
 }
 pub async fn announce(
     backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    _msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     mut args: VecDeque<String>
 ) -> Result<(), String> {
     let mut users = HashSet::new();
@@ -142,19 +148,39 @@ pub async fn announce(
     for user_id in user_ids {
         info!("Sending message to user: {user_id:?}");
 
-        tokio::spawn(dm_to_person(
-            ctx.clone(),
-            user_id,
-            message.clone()
-        ));
+        let guard = sendable.lock().await;
+        match *guard {
+            Sendable::DiscordResponseSender(ref inner) => {
+                // DM the user
+                let message = message.clone();
+                let ctx = inner.ctx.clone();
+                tokio::spawn(async move {
+                    dm_to_person(
+                        ctx,
+                        user_id,
+                        message
+                    )
+                        .await.map_err(|e| format!("{e:?}"))
+                        .expect("Failed to send message!");
+                });
+            },
+            _ => {
+                return Err(String::from("This command can only be used in Discord!"));
+            }
+        }
     }
+
+    tokio::spawn(async move {
+        sendable.lock().await
+            .finalize()
+            .await.expect("Failed to finalize message!");
+    });
     
     Ok(())
 }
 pub async fn dm_person(
     _backend_handles: BackendHandles,
-    ctx: serenity::client::Context,
-    msg: GenericMessage,
+    sendable: Arc<Mutex<Sendable>>,
     mut args: VecDeque<String>
 ) -> Result<(), String> {
     // Extract both the message and the user id
@@ -171,20 +197,41 @@ pub async fn dm_person(
     info!("Sending message to user: {user_id:?}");
 
     // Send the message
-    tokio::spawn(dm_to_person(
-        ctx.clone(),
-        serenity::model::id::UserId::new(user_id),
-        message
-    ));
+    let guard = sendable.lock().await;
+    match *guard {
+        Sendable::DiscordResponseSender(ref inner) => {
+            // DM the user
+            let ctx = inner.ctx.clone();
+
+            tokio::spawn(async move {
+                dm_to_person(
+                    ctx,
+                    serenity::model::id::UserId::new(user_id),
+                    message
+                )
+                    .await.map_err(|e| format!("{e:?}"))
+                    .expect("Failed to send message!");
+            });
+        }
+        _ => {
+            return Err(String::from("This command can only be used in Discord!"));
+        }
+    }
 
     // Send a confirmation message
-    send_embed_no_return(
-        ctx, 
-        msg.channel_id, 
-        "Success", 
-        &format!("Successfully sent message to user!"),
-        get_random_anime_girl()
-    ).await.unwrap();
+    let copied_sendable = sendable.clone();
+    tokio::spawn(async move { 
+        copied_sendable.lock().await.send(
+            "Admin - DM Success".to_string(),
+            format!("Successfully sent message to user!"),
+            get_random_anime_girl().to_string()
+        ).await
+            .map_err(|e| format!("{e:?}"))
+            .expect("Failed to send message!");
+
+        copied_sendable.lock().await.finalize()
+            .await.expect("Failed to finalize message!");
+    });
     
     Ok(())
 }

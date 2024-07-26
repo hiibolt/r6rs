@@ -13,6 +13,7 @@ pub async fn build_root_command() -> R6RSCommand {
         String::from("Commands specifically related to R6."),
         String::from("R6")
     );
+
     r6_root_command.attach(
         String::from("econ"),
         econ_commands

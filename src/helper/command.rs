@@ -1,11 +1,12 @@
-use super::lib::{get_random_anime_girl, no_access, send_embed_no_return, AsyncFnPtr};
-use crate::helper::bot::{BackendHandles, GenericMessage};
+use super::{bot::Sendable, lib::{get_random_anime_girl, AsyncFnPtr}};
+use crate::helper::bot::BackendHandles;
 
-use std::collections::{HashMap, VecDeque};
+use std::{collections::{HashMap, VecDeque}, sync::Arc};
 
 use anyhow::{Result, anyhow, bail};
 use async_recursion::async_recursion;
 use serenity::all::{CreateCommand, CreateCommandOption};
+use tokio::sync::Mutex;
 
 
 pub struct R6RSLeafCommand {
@@ -201,8 +202,7 @@ impl R6RSCommand {
     pub async fn call(
         &mut self,
         backend_handles: BackendHandles,
-        ctx: serenity::client::Context,
-        msg: GenericMessage,
+        sendable: Arc<Mutex<Sendable>>,
         mut args: VecDeque<String>
     ) -> Result<()> {
         match &mut self.inner {
@@ -216,43 +216,51 @@ impl R6RSCommand {
                     
                     body.push_str(&self.print_help(String::new(), 1, false).await);
 
-                    send_embed_no_return(
-                        ctx, 
-                        msg.channel_id, 
-                        "Command Help", 
-                        &body, 
-                        get_random_anime_girl()
+                    sendable.lock().await.send(
+                        "Command Help".to_string(),
+                        body,
+                        get_random_anime_girl().to_string()
                     ).await.unwrap();
 
                     return Ok(());
                 }
 
                 if !commands.contains_key(&next_command) {
-                    bail!("Invalid subcommand!");
+                    bail!("Invalid subcommand!\n\nRun >>help to see a list of commands!");
                 }
 
                 commands.get_mut(&next_command)
                     .expect("Unreachable!")
-                    .call(backend_handles, ctx, msg, args).await?;
+                    .call(backend_handles, sendable, args).await?;
                 Ok(())
             },
             R6RSCommandType::LeafCommand(R6RSLeafCommand{function, required_authorization, valid_args: _}) => {
-                // Verify that the sender of the message is in the required section
-                if let Some(required_section) = required_authorization {
-                    if !backend_handles.state.lock().await
-                        .bot_data
-                        .get("whitelisted_user_ids").ok_or(anyhow!("Missing whitelisted IDs JSON value!"))?
-                        .get(&*required_section).ok_or(anyhow!("Missing that section's JSON value!"))?
-                        .as_array().ok_or(anyhow!("That section isn't an array!"))?
-                        .iter()
-                        .any(|val| val.as_i64().expect("Unreachable") == msg.author.id.get() as i64) {
-                        no_access(ctx, msg.clone(), &msg.content, msg.author.id.get()).await;
-                        
-                        return Ok(());
+                // This only applies to Discord sendables
+                let value = sendable.lock().await;
+                if let Sendable::DiscordResponseSender(ref inner) = *value {
+                    // Verify that the sender of the message is in the required section
+                    if let Some(required_section) = required_authorization {
+                        if !backend_handles.state.lock().await
+                            .bot_data
+                            .get("whitelisted_user_ids").ok_or(anyhow!("Missing whitelisted IDs JSON value!"))?
+                            .get(&*required_section).ok_or(anyhow!("Missing that section's JSON value!"))?
+                            .as_array().ok_or(anyhow!("That section isn't an array!"))?
+                            .iter()
+                            .any(|val| val.as_i64().expect("Unreachable") == inner.author.id.get() as i64) {
+                            
+                            sendable.lock().await.send(
+                                "No Access".to_string(),
+                                "You do not have access to this command!".to_string(),
+                                get_random_anime_girl().to_string()
+                            ).await
+                                .unwrap();
+                            
+                            return Ok(());
+                        }
                     }
                 }
                 
-                function.run(backend_handles, ctx, msg, args).await
+                function.run(backend_handles, sendable.clone(), args).await
                     .map_err(|e| anyhow!("Encountered an error!\n\n{e:#?}"))
             }
         }
