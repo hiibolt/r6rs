@@ -117,7 +117,7 @@ impl Sendable {
                 }
 
                 // Sleep for a second to let it catch up
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
                 edit_embed(
                     &sender.ctx, 

@@ -522,7 +522,7 @@ pub async fn sherlock_helper(
     tokio::spawn(async move {
         copied_sendable.lock().await.send(
             copied_title,
-            "Preparing to search...".to_string(),
+            "## Results\n".to_string(),
             url.to_string()
         ).await.expect("Failed to send to sendable!");
     });

@@ -22,53 +22,29 @@ All commands are alternatively available as slash commands that better indicate 
 
 ## Commands
 
-### R6
+### Admin
 
-#### OPSEC
+` >>admin announce <sections> <message>`
+- Announces a message to all whitelisted users.
 
-` >>r6 opsec pc <username>`
-- Looks up a Ubisoft account based on their registered PC username.
+` >>admin blacklist <section> <user id>`
+- Removes a person from the authorized user list.
 
-` >>r6 opsec recon <username>`
-- Analyzes a Ubisoft account for suspicious behaviour based on their username (PC only).
+` >>admin whitelist <section> <user id>`
+- Adds a person to the authorized user list.
 
-` >>r6 opsec xbox <username>`
-- Looks up a Ubisoft account based on their registered Xbox username.
-
-` >>r6 opsec psn <username>`
-- Looks up a Ubisoft account based on their registered PSN username.
-
-` >>r6 opsec applications <username>`
-- Looks up a Ubisoft account based on their username (PC only).
-
-#### Economy
-
-` >>r6 econ list`
-` >>r6 econ list <page #>`
-- Lists all available skins.
-
-` >>r6 econ graph <item name | item id>`
-- Graphs the all-time history of an item.
-
-` >>r6 econ transfer`
-` >>r6 econ transfer <ubisoft email> <ubisoft password>`
-- Finds the items with the least sellers either globally or on the account with the provided login.
-
-` >>r6 econ profit <$ bought for> <item name | item id>`
-- Calculates the amount you would make if you sold your item right now.
-
-` >>r6 econ analyze <item name | item id>`
-- Creates a detailed data sheet on an item.
+` >>admin dm <user id> <message>`
+- DMs a message to a specific user.
 
 ### OSINT
 
 #### Hashing
 
-` >>osint hash dehash <hash>`
-- Dehashes a hash into pre-cracked passwords.
-
 ` >>osint hash rehash <password>`
 - Rehashes a password into pre-hashed hashes.
+
+` >>osint hash dehash <hash>`
+- Dehashes a hash into pre-cracked passwords.
 
 #### Queries
 
@@ -101,19 +77,43 @@ All commands are alternatively available as slash commands that better indicate 
 ` >>osint sherlock <username>`
 - Cross-references sites with a given username.
 
-### Admin
+### R6
 
-` >>admin blacklist <section> <user id>`
-- Removes a person from the authorized user list.
+#### Economy
 
-` >>admin whitelist <section> <user id>`
-- Adds a person to the authorized user list.
+` >>r6 econ analyze <item name | item id>`
+- Creates a detailed data sheet on an item.
 
-` >>admin announce <sections> <message>`
-- Announces a message to all whitelisted users.
+` >>r6 econ transfer`
+` >>r6 econ transfer <ubisoft email> <ubisoft password>`
+- Finds the items with the least sellers either globally or on the account with the provided login.
 
-` >>admin dm <user id> <message>`
-- DMs a message to a specific user.
+` >>r6 econ profit <$ bought for> <item name | item id>`
+- Calculates the amount you would make if you sold your item right now.
+
+` >>r6 econ list`
+` >>r6 econ list <page #>`
+- Lists all available skins.
+
+` >>r6 econ graph <item name | item id>`
+- Graphs the all-time history of an item.
+
+#### OPSEC
+
+` >>r6 opsec pc <username>`
+- Looks up a Ubisoft account based on their registered PC username.
+
+` >>r6 opsec psn <username>`
+- Looks up a Ubisoft account based on their registered PSN username.
+
+` >>r6 opsec applications <username>`
+- Looks up a Ubisoft account based on their username (PC only).
+
+` >>r6 opsec recon <username>`
+- Analyzes a Ubisoft account for suspicious behaviour based on their username (PC only).
+
+` >>r6 opsec xbox <username>`
+- Looks up a Ubisoft account based on their registered Xbox username.
 
 
 ## Setup
