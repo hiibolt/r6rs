@@ -11,7 +11,7 @@ use crate::{
 
 use std::{collections::VecDeque, sync::Arc};
 
-use serenity::all::{CreateAttachment, CreateMessage};
+use serenity::all::CreateMessage;
 use tokio::sync::Mutex;
 use tungstenite::connect;
 
@@ -129,20 +129,14 @@ pub async fn lookup(
         let builder = CreateMessage::new();
 
         // This command only works on Discord, for now.
-        let guard = sendable.lock().await;
-        if let Sendable::DiscordResponseSender(ref inner) = *guard {
-            let ctx = inner.ctx.http.clone();
-            tokio::spawn(inner.channel_id.send_files(
-                ctx,
-                std::iter::once(CreateAttachment::bytes(
-                    full_dump.as_bytes(),
-                    "full_dump.txt"
-                )),
-                builder
-            ));
-        } else {
-            todo!();
-        }
+        tokio::spawn(async move {
+            sendable.lock().await
+                .send_text_file(
+                    full_dump,
+                    builder
+                ).await
+                    .expect("Failed to upload file!");
+        });
 
         return Ok(());
     }
@@ -365,20 +359,14 @@ pub async fn dehash(
         let builder = CreateMessage::new();
 
         // This command only works on Discord, for now.
-        let guard = sendable.lock().await;
-        if let Sendable::DiscordResponseSender(ref inner) = *guard {
-            let ctx = inner.ctx.http.clone();
-            tokio::spawn(inner.channel_id.send_files(
-                ctx,
-                std::iter::once(CreateAttachment::bytes(
-                    body.as_bytes(),
-                    "full_dump.txt"
-                )),
-                builder
-            ));
-        } else {
-            todo!();
-        }
+        tokio::spawn(async move {
+            sendable.lock().await
+                .send_text_file(
+                    body,
+                    builder
+                ).await
+                    .expect("Failed to upload file!");
+        });
 
         return Ok(());
     } else if total_results == 0 {
@@ -457,20 +445,14 @@ pub async fn rehash(
         let builder = CreateMessage::new();
 
         // This command only works on Discord, for now.
-        let guard = sendable.lock().await;
-        if let Sendable::DiscordResponseSender(ref inner) = *guard {
-            let ctx = inner.ctx.http.clone();
-            tokio::spawn(inner.channel_id.send_files(
-                ctx,
-                std::iter::once(CreateAttachment::bytes(
-                    body.as_bytes(),
-                    "full_dump.txt"
-                )),
-                builder
-            ));
-        } else {
-            todo!();
-        }
+        tokio::spawn(async move {
+            sendable.lock().await
+                .send_text_file(
+                    body,
+                    builder
+                ).await
+                    .expect("Failed to upload file!");
+        });
 
         return Ok(());
     } else if total_results == 0 {

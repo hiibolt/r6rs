@@ -1,14 +1,7 @@
 use crate::{
-    apis::Ubisoft,
-    helper::{
-        lib::{get_random_anime_girl, AsyncFnPtr}, 
-        bot::{BackendHandles, State, Sendable}, 
-        command::R6RSCommand
-    },
-    info, startup,
-    VecDeque,
-    Colorize,
-    Mutex, Arc
+    apis::Ubisoft, helper::{
+        bot::{BackendHandles, Sendable, State}, command::R6RSCommand, lib::{get_random_anime_girl, AsyncFnPtr}
+    }, info, startup, Arc, Colorize, Mutex, VecDeque
 };
 
 use std::time::{
@@ -505,36 +498,40 @@ pub async fn graph(
     sendable: Arc<Mutex<Sendable>>,
     args: VecDeque<String>
 ) -> Result<(), String> {
+    info!("Grabbing item ID...");
     let item_id = graph_helper( backend_handles.state, args )
         .await?;
+    info!("Item ID: {item_id}");
 
+
+    info!("Creating attachment...");
     let attachment = CreateAttachment::path(&format!("assets/{item_id}.png"))
             .await
             .expect("Failed to create attachment!");
-
+    info!("Creating embed...");
     let embed = CreateEmbed::new()
         .image(format!("attachment://{item_id}.png"));
-
     let builder = CreateMessage::new()
         .embed(embed)
         .add_file(attachment);
 
+    info!("Allocating embed send thread...");
     // This command only works with Discord, for now.
-    let guard = sendable.lock().await;
-    if let Sendable::DiscordResponseSender(ref inner) = *guard {
-        // Send the image
-        let ctx = inner.ctx.clone();
-        tokio::spawn(inner.channel_id.send_message(ctx, builder));
-    } else {
-        return Err(String::from("This command can only be used in Discord!"));
-    }
-    drop(guard); // writing this line invoked pure euphoric bliss ^v^
+    let copied_sendable = sendable.clone();
+    tokio::spawn(async move {
+        copied_sendable.lock()
+            .await.send_premade_embed(builder)
+            .await.expect("Failed to send embed!");
+    });
 
+    // No need to finalize, as we're sending an attachment.
+    /*
     tokio::spawn(async move {
         sendable.lock().await
             .finalize()
             .await.map_err(|e| anyhow!("Failed to finalize message!\n\n{e:#?}")).unwrap();
     });
+    */
 
     Ok(())
 }

@@ -13,7 +13,7 @@ use std::{
 
 use tokio::sync::Mutex;
 use serde_json::Value;
-use serenity::{all::{ChannelId, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Interaction, ResolvedValue, User}, async_trait};
+use serenity::{all::{ChannelId, CreateAttachment, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage, GuildId, Interaction, ResolvedValue, User}, async_trait};
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
@@ -31,6 +31,7 @@ pub struct WebAPIResponseSender {
     pub _image: String,
     pub _socket_sender: WebSocket<MaybeTlsStream<TcpStream>>
 }
+#[derive(Clone)]
 pub struct DiscordResponseSender {
     pub ctx: serenity::client::Context,
     pub title: String,
@@ -40,7 +41,7 @@ pub struct DiscordResponseSender {
     pub author: User,
     pub message: Option<Message>,
     pub start_time: SystemTime,
-    pub ongoing_edits: AtomicU16
+    pub ongoing_edits: Arc<AtomicU16>
 }
 impl Sendable {
     pub async fn send(
@@ -63,6 +64,46 @@ impl Sendable {
                     &sender.image
                 ).await
                     .map_err(|e| format!("Failed to send message!\n\n{e:?}"))?);
+            },
+            _ => {
+                panic!("Invalid sender type!");
+            }
+        }
+
+        Ok(())
+    }
+    pub async fn send_premade_embed(
+        &mut self,
+        builder: CreateMessage
+    ) -> Result<(), String> {
+        match self {
+            Sendable::DiscordResponseSender(sender) => {
+                sender.channel_id.send_message(sender.ctx.clone(), builder).await
+                    .map_err(|e| format!("An error occurred sending the embed!\n\n{e:?}"))?;
+            },
+            _ => {
+                panic!("Invalid sender type!");
+            }
+        }
+
+        Ok(())
+    }
+    pub async fn send_text_file(
+        &mut self,
+        content: String,
+        builder: CreateMessage
+    ) -> Result<(), String> {
+        match self {
+            Sendable::DiscordResponseSender(sender) => {
+                sender.channel_id.send_files(
+                    sender.ctx.clone(),
+                    std::iter::once(CreateAttachment::bytes(
+                        content.as_bytes(),
+                        "full_dump.txt"
+                    )),
+                    builder
+                ).await
+                    .map_err(|e| format!("An error occurred sending the embed!\n\n{e:?}"))?;
             },
             _ => {
                 panic!("Invalid sender type!");
@@ -308,7 +349,7 @@ impl EventHandler for Bot {
             author: msg.author.clone(),
             message: None,
             start_time: SystemTime::now(),
-            ongoing_edits: AtomicU16::new(0)
+            ongoing_edits: Arc::new(AtomicU16::new(0))
         })));
         if let Err(err) = self.root_command.lock().await.call(
             self.backend_handles.clone(),
@@ -410,7 +451,7 @@ impl EventHandler for Bot {
                 author: command.member.clone().unwrap().user.clone(),
                 message: None,
                 start_time: SystemTime::now(),
-                ongoing_edits: AtomicU16::new(0)
+                ongoing_edits: Arc::new(AtomicU16::new(0))
             });
 
             // Log the slash command to the database
