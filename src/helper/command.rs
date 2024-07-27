@@ -220,7 +220,10 @@ impl R6RSCommand {
                         "Command Help".to_string(),
                         body,
                         get_random_anime_girl().to_string()
-                    ).await.unwrap();
+                    ).await.expect("Failed to send help message!");
+
+                    sendable.lock().await.finalize()
+                        .await.expect("Failed to finalize message!");
 
                     return Ok(());
                 }
