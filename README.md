@@ -22,71 +22,73 @@ All commands are alternatively available as slash commands that better indicate 
 
 ## Commands
 
-### Admin
-
-` >>admin announce <sections> <message>`
-- Announces a message to all whitelisted users.
-
-` >>admin blacklist <section> <user id>`
-- Removes a person from the authorized user list.
-
-` >>admin whitelist <section> <user id>`
-- Adds a person to the authorized user list.
-
-` >>admin dm <user id> <message>`
-- DMs a message to a specific user.
-
 ### OSINT
 
-#### Hashing
-
-` >>osint hash rehash <password>`
-- Rehashes a password into pre-hashed hashes.
-
-` >>osint hash dehash <hash>`
-- Dehashes a hash into pre-cracked passwords.
-
 #### Queries
-
-` >>osint query email <email>`
-- Queries for leaks based on an email.
-
-` >>osint query ip <ip>`
-- Queries for leaks based on a last IP.
 
 ` >>osint query hash <hash>`
 - Queries for leaks based on a hash.
 
+` >>osint query name <name>`
+- Queries for leaks based on a name.
+
+` >>osint query email <email>`
+- Queries for leaks based on an email.
+
 ` >>osint query username <username>`
 - Queries for leaks based on a username.
+
+` >>osint query ip <ip>`
+- Queries for leaks based on a last IP.
 
 ` >>osint query password <password>`
 - Queries for leaks based on a password.
 
-` >>osint query name <name>`
-- Queries for leaks based on a name.
+#### Hashing
+
+` >>osint hash dehash <hash>`
+- Dehashes a hash into pre-cracked passwords.
+
+` >>osint hash rehash <password>`
+- Rehashes a password into pre-hashed hashes.
 
 #### Other
-
-` >>osint phone <phone number>`
-- Perform a Caller ID lookup on a phone number.
-
-` >>osint geolocate <ip>`
-- Geolocates an IP.
 
 ` >>osint sherlock <username>`
 - Cross-references sites with a given username.
 
+` >>osint geolocate <ip>`
+- Geolocates an IP.
+
+` >>osint phone <phone number>`
+- Perform a Caller ID lookup on a phone number.
+
 ### R6
+
+#### OPSEC
+
+` >>r6 opsec recon <username>`
+- Analyzes a Ubisoft account for suspicious behaviour based on their username (PC only).
+
+` >>r6 opsec psn <username>`
+- Looks up a Ubisoft account based on their registered PSN username.
+
+` >>r6 opsec pc <username>`
+- Looks up a Ubisoft account based on their registered PC username.
+
+` >>r6 opsec applications <username>`
+- Looks up a Ubisoft account based on their username (PC only).
+
+` >>r6 opsec xbox <username>`
+- Looks up a Ubisoft account based on their registered Xbox username.
 
 #### Economy
 
+` >>r6 econ graph <item name | item id>`
+- Graphs the all-time history of an item.
+
 ` >>r6 econ analyze <item name | item id>`
 - Creates a detailed data sheet on an item.
-
-` >>r6 econ transfer`
-` >>r6 econ transfer <ubisoft email> <ubisoft password>`
-- Finds the items with the least sellers either globally or on the account with the provided login.
 
 ` >>r6 econ profit <$ bought for> <item name | item id>`
 - Calculates the amount you would make if you sold your item right now.
@@ -95,25 +97,23 @@ All commands are alternatively available as slash commands that better indicate 
 ` >>r6 econ list <page #>`
 - Lists all available skins.
 
-` >>r6 econ graph <item name | item id>`
-- Graphs the all-time history of an item.
+` >>r6 econ transfer`
+` >>r6 econ transfer <ubisoft email> <ubisoft password>`
+- Finds the items with the least sellers either globally or on the account with the provided login.
 
-#### OPSEC
+### Admin
 
-` >>r6 opsec pc <username>`
-- Looks up a Ubisoft account based on their registered PC username.
+` >>admin blacklist <section> <user id>`
+- Removes a person from the authorized user list.
 
-` >>r6 opsec psn <username>`
-- Looks up a Ubisoft account based on their registered PSN username.
+` >>admin dm <user id> <message>`
+- DMs a message to a specific user.
 
-` >>r6 opsec applications <username>`
-- Looks up a Ubisoft account based on their username (PC only).
+` >>admin announce <sections> <message>`
+- Announces a message to all whitelisted users.
 
-` >>r6 opsec recon <username>`
-- Analyzes a Ubisoft account for suspicious behaviour based on their username (PC only).
-
-` >>r6 opsec xbox <username>`
-- Looks up a Ubisoft account based on their registered Xbox username.
+` >>admin whitelist <section> <user id>`
+- Adds a person to the authorized user list.
 
 
 ## Setup

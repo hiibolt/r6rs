@@ -114,13 +114,18 @@ pub async fn autopull( state: Arc<Mutex<State>> ) {
     loop {
         daemon!("Pulled market data :3");
 
-        let market_data_contents: String = read_to_string("assets/data.json")
-            .expect("Could not find 'assets/data.json', please ensure you have created one!");
-    
-        state.lock()
-            .await
-            .market_data = serde_json::from_str(&market_data_contents)
-                .expect("Could not parse the contents of 'data.json'!");
+        if let Ok(market_data_contents) = read_to_string("assets/data.json") {
+            match serde_json::from_str(&market_data_contents) {
+                Ok(market_data) => {
+                    state.lock()
+                        .await
+                        .market_data = market_data;
+                },
+                Err(e) => {
+                    error!("Could not parse the contents of 'data.json'!\n\n{e:?}");
+                }
+            }
+        }
 
         sleep(Duration::from_secs(60)).await;
     }
