@@ -245,7 +245,10 @@ pub async fn cnam_lookup(
 
     let response = backend_handles.bulkvs.lock()
         .await
-        .query_phone_number(&phone_number)
+        .query_phone_number(&phone_number
+            .replace("-", "")
+            .replace("(", "")
+            .replace(")", ""))
         .map_err(|e| format!("{e:#?}"))?;
 
     let mut message = String::new();
