@@ -1,6 +1,4 @@
 # r6rs
-<img src="https://github.com/user-attachments/assets/80b94970-f42b-49a0-9c99-dba6f59598d6"/>
-
 ### About
 A General Purpose Discord Bot containing multiple powerful OSINT tools, designed to improve upon and run in tandem with [r6econ](https://github.com/hiibolt/r6econ). 
 
