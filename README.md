@@ -1,8 +1,8 @@
 # r6rs
-<img src="https://github.com/hiibolt/hiibolt/assets/91273156/9528b9af-4166-4b51-b3f8-084d75dccc3b" width="200"/>
+<img src="https://github.com/user-attachments/assets/80b94970-f42b-49a0-9c99-dba6f59598d6"/>
 
 ### About
-A General Purpose Discord Bot for Tom Clancy's Rainbow Six Siege designed to improve upon and run in tandem with [r6econ](https://github.com/hiibolt/r6econ), but containing multiple powerful OSINT tools. 
+A General Purpose Discord Bot containing multiple powerful OSINT tools, designed to improve upon and run in tandem with [r6econ](https://github.com/hiibolt/r6econ). 
 
 Includes many, many utilities for gathering open source intelligence via a variety of paid APIs in a succint, error-checked, and pretty looking package.
 
