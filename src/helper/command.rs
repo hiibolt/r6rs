@@ -209,7 +209,10 @@ impl R6RSCommand {
             R6RSCommandType::RootCommand(R6RSRootCommand{ commands, section_title: _}) => {
                 let next_command = args
                     .pop_front()
-                    .ok_or(anyhow!("Missing subcommand!"))?;
+                    .ok_or_else(|| {
+                        anyhow!("Missing subcommand!\n\nAvailable sub-commands: {}",
+                            commands.keys().map(|key| format!("`{}`", key)).collect::<Vec<String>>().join(", "))
+                    })?;
 
                 if next_command == "help" || next_command == ">>help" {
                     let mut body = self.description.to_owned() + "\n";
@@ -229,7 +232,9 @@ impl R6RSCommand {
                 }
 
                 if !commands.contains_key(&next_command) {
-                    bail!("Invalid subcommand!\n\nRun >>help to see a list of commands!");
+                    bail!("`{}` is not a valid subcommand!\n\nAvailable sub-commands: {}",
+                        next_command,
+                        commands.keys().map(|key| format!("`{}`", key)).collect::<Vec<String>>().join(", "));
                 }
 
                 commands.get_mut(&next_command)
