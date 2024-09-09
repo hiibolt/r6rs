@@ -275,11 +275,14 @@ impl R6RSCommand {
                     ).await
                         .unwrap();
 
+                    sendable.lock().await
+                        .finalize()
+                        .await.expect("Failed to finalize message!");
+
                     info!("Unauthorized access to command!");
                     
                     return Ok(());
                 }
-                
                 
                 function.run(backend_handles, sendable.clone(), args).await
                     .map_err(|e| anyhow!("Encountered an error!\n\n{e:#?}"))
