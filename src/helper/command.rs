@@ -1,5 +1,5 @@
 use super::{bot::Sendable, lib::{get_random_anime_girl, AsyncFnPtr}};
-use crate::helper::bot::BackendHandles;
+use crate::{helper::bot::BackendHandles, info};
 
 use std::{collections::{HashMap, VecDeque}, sync::Arc};
 
@@ -7,6 +7,7 @@ use anyhow::{Result, anyhow, bail};
 use async_recursion::async_recursion;
 use serenity::all::{CreateCommand, CreateCommandOption};
 use tokio::sync::Mutex;
+use colored::Colorize;
 
 
 pub struct R6RSLeafCommand {
@@ -245,8 +246,10 @@ impl R6RSCommand {
             R6RSCommandType::LeafCommand(R6RSLeafCommand{function, required_authorization, valid_args: _}) => {
                 // This only applies to Discord sendables
                 let value = sendable.lock().await;
+
+                // Verify that the sender of the message is in the required section
+                let mut auth = true;
                 if let Sendable::DiscordResponseSender(ref inner) = *value {
-                    // Verify that the sender of the message is in the required section
                     if let Some(required_section) = required_authorization {
                         if !backend_handles.state.lock().await
                             .bot_data
@@ -256,17 +259,27 @@ impl R6RSCommand {
                             .iter()
                             .any(|val| val.as_i64().expect("Unreachable") == inner.author.id.get() as i64) {
                             
-                            sendable.lock().await.send(
-                                "No Access".to_string(),
-                                "You do not have access to this command!".to_string(),
-                                get_random_anime_girl().to_string()
-                            ).await
-                                .unwrap();
-                            
-                            return Ok(());
+                            auth = false;
                         }
                     }
                 }
+
+                // Prevents a deadlock
+                drop(value);
+                
+                if !auth {
+                    sendable.lock().await.send(
+                        "No Access".to_string(),
+                        "You do not have access to this command!".to_string(),
+                        get_random_anime_girl().to_string()
+                    ).await
+                        .unwrap();
+
+                    info!("Unauthorized access to command!");
+                    
+                    return Ok(());
+                }
+                
                 
                 function.run(backend_handles, sendable.clone(), args).await
                     .map_err(|e| anyhow!("Encountered an error!\n\n{e:#?}"))
