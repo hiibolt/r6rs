@@ -28,11 +28,14 @@ pub async fn lookup(
         .map(|s| s.to_string())
         .collect::<Vec<String>>();
 
+    let mut cloned_args = args.clone();
+    let first_arg = cloned_args.pop_front();
+
     // Check if the query contains any blacklisted strings
-    for arg in &args {
-        for blacklisted_string in &blacklisted_strings {
-            if arg.contains(blacklisted_string) {
-                return Err(format!("The query contains a blacklisted piece of information: `{}` If this is in error, please contact @hiibolt.", blacklisted_string));
+    for blacklisted_string in &blacklisted_strings {
+        if let Some(ref ar) = first_arg {
+            if *ar == *blacklisted_string {
+                return Err(format!("The query contains a blacklisted string: '{}'\n\nIf this is in error, please contact @hiibolt!", blacklisted_string));
             }
         }
     }
