@@ -259,6 +259,24 @@ pub async fn cnam_lookup(
     sendable: Arc<Mutex<Sendable>>,
     mut args: VecDeque<String>
 ) -> Result<(), String> {
+    // First, load the blacklisted strings from ./assets/blacklist.txt
+    let blacklisted_strings = std::fs::read_to_string("./assets/blacklist.txt")
+        .expect("Failed to read blacklist.txt!")
+        .split("\n")
+        .map(|s| s.to_string())
+        .collect::<Vec<String>>();
+
+    let mut cloned_args = args.clone();
+    let first_arg = cloned_args.pop_front();
+
+    // Check if the query contains any blacklisted strings
+    for blacklisted_string in &blacklisted_strings {
+        if let Some(ref ar) = first_arg {
+            if *ar == *blacklisted_string {
+                return Err(format!("The query contains a blacklisted string: '{}'. If this is in error, please contact @hiibolt!", blacklisted_string));
+            }
+        }
+    }
     let phone_number = args.pop_front()
         .ok_or(String::from("Missing phone number!"))?;
 
