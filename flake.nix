@@ -54,6 +54,8 @@
             rustfmt
             clippy
             openssl.dev
+            git
+            gh
           ]) ++ [ python ];
           libPath = with pkgs; lib.makeLibraryPath [
             udev
