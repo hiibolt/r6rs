@@ -9,7 +9,7 @@ Includes many, many utilities for gathering open source intelligence via a varie
 All sections can be placed behind a Discord User ID whitelist system, allowing selective distribution via a key system.
 
 All commands are alternatively available as slash commands that better indicate what constitutes each argument, as well as whether a given argument is optional.
-
+ 
 ## Packaged Utilities 
 - Sherlock
 - BulkVS - CNAM Lookup
