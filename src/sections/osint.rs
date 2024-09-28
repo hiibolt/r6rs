@@ -35,7 +35,7 @@ pub async fn lookup(
     for blacklisted_string in &blacklisted_strings {
         if let Some(ref ar) = first_arg {
             if *ar == *blacklisted_string {
-                return Err(format!("The query contains a blacklisted string: '{}'\n\nIf this is in error, please contact @hiibolt!", blacklisted_string));
+                return Err(format!("The query contains a blacklisted string: '{}'. If this is in error, please contact @hiibolt!", blacklisted_string));
             }
         }
     }

@@ -9,7 +9,7 @@ Includes many, many utilities for gathering open source intelligence via a varie
 All sections can be placed behind a Discord User ID whitelist system, allowing selective distribution via a key system.
 
 All commands are alternatively available as slash commands that better indicate what constitutes each argument, as well as whether a given argument is optional.
- 
+
 ## Packaged Utilities 
 - Sherlock
 - BulkVS - CNAM Lookup
@@ -24,39 +24,39 @@ All commands are alternatively available as slash commands that better indicate 
 
 ### Admin
 
-` >>admin whitelist <section> <user id>`
-- Adds a person to the authorized user list.
+` >>admin dm <user id> <message>`
+- DMs a message to a specific user.
 
 ` >>admin announce <sections> <message>`
 - Announces a message to all whitelisted users.
 
+` >>admin whitelist <section> <user id>`
+- Adds a person to the authorized user list.
+
 ` >>admin blacklist <section> <user id>`
 - Removes a person from the authorized user list.
-
-` >>admin dm <user id> <message>`
-- DMs a message to a specific user.
 
 ### OSINT
 
 #### Queries
 
-` >>osint query hash <hash>`
-- Queries for leaks based on a hash.
+` >>osint query name <name>`
+- Queries for leaks based on a name.
 
 ` >>osint query ip <ip>`
 - Queries for leaks based on a last IP.
 
-` >>osint query username <username>`
-- Queries for leaks based on a username.
-
 ` >>osint query email <email>`
 - Queries for leaks based on an email.
 
+` >>osint query username <username>`
+- Queries for leaks based on a username.
+
+` >>osint query hash <hash>`
+- Queries for leaks based on a hash.
+
 ` >>osint query password <password>`
 - Queries for leaks based on a password.
-
-` >>osint query name <name>`
-- Queries for leaks based on a name.
 
 #### Hashing
 
@@ -68,18 +68,21 @@ All commands are alternatively available as slash commands that better indicate 
 
 #### Other
 
-` >>osint sherlock <username>`
-- Cross-references sites with a given username.
+` >>osint phone <phone number>`
+- Perform a Caller ID lookup on a phone number.
 
 ` >>osint geolocate <ip>`
 - Geolocates an IP.
 
-` >>osint phone <phone number>`
-- Perform a Caller ID lookup on a phone number.
+` >>osint sherlock <username>`
+- Cross-references sites with a given username.
 
 ### R6
 
 #### Economy
+
+` >>r6 econ profit <$ bought for> <item name | item id>`
+- Calculates the amount you would make if you sold your item right now.
 
 ` >>r6 econ transfer`
 ` >>r6 econ transfer <ubisoft email> <ubisoft password>`
@@ -95,25 +98,22 @@ All commands are alternatively available as slash commands that better indicate 
 ` >>r6 econ graph <item name | item id>`
 - Graphs the all-time history of an item.
 
-` >>r6 econ profit <$ bought for> <item name | item id>`
-- Calculates the amount you would make if you sold your item right now.
-
 #### OPSEC
-
-` >>r6 opsec xbox <username>`
-- Looks up a Ubisoft account based on their registered Xbox username.
 
 ` >>r6 opsec pc <username>`
 - Looks up a Ubisoft account based on their registered PC username.
 
-` >>r6 opsec applications <username>`
-- Looks up a Ubisoft account based on their username (PC only).
-
 ` >>r6 opsec psn <username>`
 - Looks up a Ubisoft account based on their registered PSN username.
 
+` >>r6 opsec applications <username>`
+- Looks up a Ubisoft account based on their username (PC only).
+
 ` >>r6 opsec recon <username>`
 - Analyzes a Ubisoft account for suspicious behaviour based on their username (PC only).
+
+` >>r6 opsec xbox <username>`
+- Looks up a Ubisoft account based on their registered Xbox username.
 
 
 ## Setup
