@@ -21,6 +21,22 @@ pub async fn lookup(
     mut args: VecDeque<String>,
     lookup_type: &str
 ) -> Result<(), String> {
+    // First, load the blacklisted strings from ./assets/blacklist.txt
+    let blacklisted_strings = std::fs::read_to_string("./assets/blacklist.txt")
+        .expect("Failed to read blacklist.txt!")
+        .split("\n")
+        .map(|s| s.to_string())
+        .collect::<Vec<String>>();
+
+    // Check if the query contains any blacklisted strings
+    for arg in &args {
+        for blacklisted_string in &blacklisted_strings {
+            if arg.contains(blacklisted_string) {
+                return Err(format!("The query contains a blacklisted piece of information: `{}` If this is in error, please contact @hiibolt.", blacklisted_string));
+            }
+        }
+    }
+
     let snusbase_response_result = match lookup_type {
         "email" => {
             let mut ret = Err(anyhow::anyhow!("No email provided!"));

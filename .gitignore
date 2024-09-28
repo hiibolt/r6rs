@@ -3,3 +3,4 @@
 .envrc
 test.py
 *.png
+blacklist.txt
