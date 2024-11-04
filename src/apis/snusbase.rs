@@ -164,7 +164,7 @@ impl Snusbase {
         }
         
         // Query Snusbase
-        let resp_object = ureq::post("https://api-experimental.snusbase.com/tools/ip-whois")
+        let resp_object = ureq::post("https://api.snusbase.com/tools/ip-whois")
             .set("Auth", &self.api_key )
             .set("Content-Type", "application/json")
             .send_json(ureq::json!({
@@ -189,7 +189,7 @@ impl Snusbase {
         wildcard: bool
     ) -> Result<SnusbaseDBResponse> {
         // Query Snusbase
-        let resp_object = ureq::post("https://api-experimental.snusbase.com/data/search")
+        let resp_object = ureq::post("https://api.snusbase.com/data/search")
             .set("Auth", &self.api_key )
             .set("Content-Type", "application/json")
             .send_json(ureq::json!({
@@ -216,7 +216,7 @@ impl Snusbase {
         wildcard: bool
     ) -> Result<SnusbaseHashLookupResponse> {
         // Query Snusbase
-        let resp_object = ureq::post("https://api-experimental.snusbase.com/tools/hash-lookup")
+        let resp_object = ureq::post("https://api.snusbase.com/tools/hash-lookup")
             .set("Auth", &self.api_key )
             .set("Content-Type", "application/json")
             .send_json(ureq::json!({
