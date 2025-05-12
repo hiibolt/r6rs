@@ -8,7 +8,7 @@ use scraper::{Html, Selector};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 
-use anyhow::{Result, anyhow};
+use anyhow::{Result, Context, anyhow};
 
 #[derive(Debug)]
 pub struct PlayedWithPlayer<'a> {
