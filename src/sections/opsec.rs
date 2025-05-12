@@ -270,8 +270,9 @@ async fn applications_helper(
     // Ensure that input is an account ID
     account_id =  ubisoft_api
         .lock().await
-        .get_account_id(account_id.clone(), String::from("uplay")).await
-        .map_err(|_| format!("Account **{account_id}** does not exist!"))?;
+        .get_account_id(account_id.clone(), String::from("uplay"))
+        .await
+        .with_context(|| format!("Failed to get account id `{account_id}`"))?;
 
     let res = ubisoft_api.lock().await
         .get_applications(account_id.clone()).await
