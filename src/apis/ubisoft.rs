@@ -32,7 +32,14 @@ impl Ubisoft {
         }
     }
     pub async fn login ( &mut self ) -> Result<()> {
-        let client = reqwest::Client::new();
+        let proxy_url = std::env::var("PROXY_URL")
+            .context("Couldn't find proxy URL in environment! Be sure to set `PROXY_URL`.")?;
+        let proxy = reqwest::Proxy::all(proxy_url)
+            .context("Failed to create proxy!")?;
+        let client = reqwest::Client::builder()
+            .proxy(proxy)
+            .build()
+            .context("Failed to create HTTP client!")?;
 
         self.headers.insert("Authorization", format!("Basic {}", self.token).parse()?);
         self.headers.insert("User-Agent", "UbiServices_SDK_2020.Release.58_PC64_ansi_static".parse()?);
@@ -80,7 +87,14 @@ impl Ubisoft {
     }
 
     pub async fn basic_request ( &mut self, url: String ) -> Result<Value> {
-        let client = reqwest::Client::new();
+        let proxy_url = std::env::var("PROXY_URL")
+            .context("Couldn't find proxy URL in environment! Be sure to set `PROXY_URL`.")?;
+        let proxy = reqwest::Proxy::all(proxy_url)
+            .context("Failed to create proxy!")?;
+        let client = reqwest::Client::builder()
+            .proxy(proxy)
+            .build()
+            .context("Failed to create HTTP client!")?;
 
         let request = client.get(&url)
             .headers(self.headers.clone());
@@ -106,7 +120,14 @@ impl Ubisoft {
         }
     }
     pub async fn graphql_request ( &mut self, url: String, body: String ) -> Result<Value> {
-        let client = reqwest::Client::new();
+        let proxy_url = std::env::var("PROXY_URL")
+            .context("Couldn't find proxy URL in environment! Be sure to set `PROXY_URL`.")?;
+        let proxy = reqwest::Proxy::all(proxy_url)
+            .context("Failed to create proxy!")?;
+        let client = reqwest::Client::builder()
+            .proxy(proxy)
+            .build()
+            .context("Failed to create HTTP client!")?;
 
         let mut headers_with_new_locale = self.headers.clone();
         headers_with_new_locale.insert("Ubi-LocaleCode", "en-US".parse()?);

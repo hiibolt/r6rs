@@ -8,7 +8,7 @@ use scraper::{Html, Selector};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 
-use anyhow::{Result, Context, anyhow};
+use anyhow::{Result, anyhow};
 
 #[derive(Debug)]
 pub struct PlayedWithPlayer<'a> {
@@ -177,7 +177,7 @@ async fn linked_helper(
     account_id = ubisoft_api
         .lock().await
         .get_account_id(account_id.clone(), platform).await
-        .map_err(|_| format!("Account **{account_id}** does not exist!"))?;
+        .map_err(|e| format!("Could not get account **{account_id}** for reason `{e:?}`"))?;
     
     // Ensure valid account ID
     let profiles: Vec<Value> = get_profiles( ubisoft_api.clone(), &account_id )
@@ -272,7 +272,7 @@ async fn applications_helper(
         .lock().await
         .get_account_id(account_id.clone(), String::from("uplay"))
         .await
-        .with_context(|| format!("Failed to get account id `{account_id}`"))?;
+        .map_err(|e| format!("Failed to get account id `{account_id}` for reason `{e:?}`"))?;
 
     let res = ubisoft_api.lock().await
         .get_applications(account_id.clone()).await

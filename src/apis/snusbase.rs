@@ -152,7 +152,7 @@ impl Snusbase {
     pub fn new() -> Result<Self> {
         Ok(Self { 
             api_key: std::env::var("SNUSBASE_API_KEY")
-                .context("Couldn't initialize Snusbase client")? 
+                .context("Missing `SNUSBASE_API_KEY` in environment!")? 
         })
     }
     pub async fn whois_ip_query (

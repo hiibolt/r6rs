@@ -3,7 +3,7 @@ use super::{
     lib::{ edit_embed, get_random_anime_girl, send_embed }
 };
 use crate::{
-    apis::{BulkVS, Database, Snusbase, Ubisoft, database::CommandEntry}, 
+    apis::{BulkVS, Snusbase, Ubisoft}, 
     error, info, startup, warn
 };
 
@@ -234,8 +234,7 @@ pub struct BackendHandles {
     pub ubisoft_api: Arc<Mutex<Ubisoft>>,
     pub snusbase:    Arc<Mutex<Snusbase>>,
     pub bulkvs:      Arc<Mutex<BulkVS>>,
-    pub state:       Arc<Mutex<State>>,
-    pub database:    Arc<Mutex<Database>>
+    pub state:       Arc<Mutex<State>>
 }
 pub struct State {
     pub bot_data: Value,
@@ -261,11 +260,6 @@ impl EventHandler for Bot {
             .split(' ')
             .map(|i| String::from(i))
             .collect();
-        let user_id: u64 = msg.author.id.get();
-        let message_id: u64 = msg.id.get();
-        let server_id = msg.guild_id
-            .and_then(|gid| Some(gid.get()))
-            .unwrap_or(0u64);
 
         // Double check that the message is a command meant for the bot
         if let Ok(val) = std::env::var("DEV_MODE") {
@@ -323,18 +317,6 @@ impl EventHandler for Bot {
             };
 
             args.push_back(st);
-        }
-
-        // Log the command to the database
-        if let Err(e) = self.backend_handles.database
-            .lock().await
-            .upload_command(CommandEntry { 
-                message_id,
-                user_id,
-                server_id,
-                command: msg.content.clone()
-            }) {
-            warn!("Failed to update DB with reason `{e}`!");
         }
 
         // Call the command
@@ -453,23 +435,6 @@ impl EventHandler for Bot {
                 start_time: SystemTime::now(),
                 ongoing_edits: Arc::new(AtomicU16::new(0))
             });
-
-            // Log the slash command to the database
-            let user_id: u64 = command.member.clone().unwrap().user.id.get();
-            let message_id: u64 = command.id.get();
-            let server_id = command.guild_id
-                .and_then(|gid| Some(gid.get()))
-                .unwrap_or(0u64);
-            if let Err(e) = self.backend_handles.database
-                .lock().await
-                .upload_command(CommandEntry { 
-                    message_id,
-                    user_id,
-                    server_id,
-                    command: command.data.name.clone() + " - [slash command]"
-                }) {
-                warn!("Failed to update DB with reason `{e}`!");
-            }
 
             // Let the user know you're about to start working
             if let Err(why) = command.create_response(

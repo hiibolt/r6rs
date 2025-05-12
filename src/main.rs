@@ -4,7 +4,7 @@ mod apis;
 
 use crate::{
     helper::{lib::inject_documentation, command::R6RSCommand},
-    apis::{Snusbase, BulkVS, Ubisoft, Database},
+    apis::{Snusbase, BulkVS, Ubisoft},
     helper::{bot::{Bot, State}, startup::build_root_command, bot::BackendHandles},
     
 };
@@ -41,7 +41,7 @@ struct APIState {
 async fn main() -> Result<()> {
     // Get intents and token
     let token = env::var("DISCORD_BOT_TOKEN")
-        .context("Expected a token in the environment")?;
+        .context("Expected `DISCORD_BOT_TOKEN` in the environment")?;
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT;
@@ -82,19 +82,6 @@ async fn main() -> Result<()> {
         .context("Could not find UBISOFT_AUTH_PW in the environment!")?
     )));
 
-    // Build the Database object and log in
-    let database = Arc::new(Mutex::new(Database::new(
-        env::var("DATABASE_API_KEY")
-            .context("Could not find DATABASE_API_KEY in the environment!")?
-    )));
-
-    // Test that the database is operational
-    if let Err(e) = database
-        .lock().await
-        .verify_db() {
-        warn!("Failed to update DB with reason `{e}`!");
-    }
-
     // Start login process
     tokio::spawn(Ubisoft::auto_login( ubisoft_api.clone()));
 
@@ -128,7 +115,6 @@ async fn main() -> Result<()> {
                 ubisoft_api: ubisoft_api.clone(),
                 snusbase: snusbase.clone(),
                 bulkvs: bulkvs.clone(),
-                database: database.clone(),
                 state: state.clone()
             }
         })
@@ -153,7 +139,6 @@ async fn main() -> Result<()> {
                 ubisoft_api,
                 snusbase,
                 bulkvs,
-                database,
                 state
             },
             root_command
