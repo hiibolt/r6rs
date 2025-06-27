@@ -44,7 +44,7 @@ impl Ubisoft {
         self.headers.insert("Authorization", format!("Basic {}", self.token).parse()?);
         self.headers.insert("User-Agent", "UbiServices_SDK_2020.Release.58_PC64_ansi_static".parse()?);
         self.headers.insert("Content-Type", "application/json; charset=UTF-8".parse()?);
-        self.headers.insert("Ubi-AppId", "e3d5ea9e-50bd-43b7-88bf-39794f4e3d40".parse()?);
+        self.headers.insert("Ubi-AppId", "4391c956-8943-48eb-8859-07b0778f47b9".parse()?);
         self.headers.insert("Ubi-LocaleCode", "en-us".parse()?);
         
 
