@@ -80,7 +80,7 @@ async fn main() -> Result<()> {
         .context("Could not find UBISOFT_AUTH_EMAIL in the environment!")?,
     env::var("UBISOFT_AUTH_PW")
         .context("Could not find UBISOFT_AUTH_PW in the environment!")?
-    )));
+    ).context("Failed to create Ubisoft API!")?));
 
     // Start login process
     tokio::spawn(Ubisoft::auto_login( ubisoft_api.clone()));

@@ -71,14 +71,18 @@ pub struct GPTFlagEntry {
 async fn get_profiles(
     ubisoft_api: Arc<Mutex<Ubisoft>>,
     account_id: &str
-) -> Option<Vec<Value>> {
+) -> Result<Vec<Value>> {
     let profiles: Value = ubisoft_api
         .lock().await
         .basic_request(format!("https://public-ubiservices.ubi.com/v3/users/{account_id}/profiles"))
-        .await.ok()?;
+        .await
+        .map_err(|e| anyhow!("Failed to query profiles for account `{account_id}` for reason `{e:?}`"))?;
     
-    Some(profiles.get("profiles")?
-        .as_array()?.clone())
+    Ok(profiles.get("profiles")
+        .ok_or(anyhow!("Failed to get profiles key for account `{account_id}`!"))?
+        .as_array()
+        .ok_or(anyhow!("Failed to get profiles array for account `{account_id}`!"))?
+        .clone())
 } 
 fn stringify_profiles(
     profiles: &Vec<Value>,
@@ -182,7 +186,7 @@ async fn linked_helper(
     // Ensure valid account ID
     let profiles: Vec<Value> = get_profiles( ubisoft_api.clone(), &account_id )
         .await
-        .ok_or(format!("Account ID **{account_id}** does not exist!"))?;
+        .map_err(|e| format!("Couldn't get profiles for account `{account_id}` for reason {e}!"))?;
     let mut usernames: HashSet<String> = HashSet::new();
     
     body += "## ⛓️ Linked Profiles\n";
@@ -696,7 +700,7 @@ pub async fn recon(
     // Get profiles
     let profiles: Vec<Value> = get_profiles( backend_handles.ubisoft_api.clone(), &account_id )
         .await
-        .ok_or(format!("Account ID **{account_id}** does not exist!"))?;
+        .map_err(|e| format!("Failed to get profiles for account `{account_id}` for reason `{e}`"))?;
     let uplay_username = profiles.iter()
         .find(|profile| profile["platformType"].as_str() == Some("uplay"))
         .and_then(|profile| profile["nameOnPlatform"].as_str())

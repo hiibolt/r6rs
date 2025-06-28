@@ -363,7 +363,9 @@ pub async fn transfer (
         if let Some(password) = args.pop_front() {
             info!("Logging in with email: {email} and password: {password}");
 
-            let temporary_ubisoft_api = Arc::new(Mutex::new(Ubisoft::new(email, password)));
+            let temporary_ubisoft_api = Arc::new(Mutex::new(
+                Ubisoft::new(email, password).map_err(|e| e.to_string())?
+            ));
 
             if let Err(err) = temporary_ubisoft_api.lock().await.login().await {
                 tokio::spawn(async move { 

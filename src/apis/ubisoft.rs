@@ -15,7 +15,8 @@ use tokio::{
 #[derive(Debug)]
 pub struct Ubisoft {
     token: String,
-    headers: HeaderMap
+    headers: HeaderMap,
+    client: reqwest::Client
 }
 impl Ubisoft {
     fn get_basic_token ( email: String, password: String ) -> String {
@@ -23,15 +24,8 @@ impl Ubisoft {
             .encode(format!("{}:{}", email, password))
     }
 
-    pub fn new ( email: String, password: String ) -> Self {
+    pub fn new ( email: String, password: String ) -> Result<Self> {
         let token = Self::get_basic_token( email.clone(), password.clone() );
-
-        Self {
-            token,
-            headers: HeaderMap::new()
-        }
-    }
-    pub async fn login ( &mut self ) -> Result<()> {
         let proxy_url = std::env::var("PROXY_URL")
             .context("Couldn't find proxy URL in environment! Be sure to set `PROXY_URL`.")?;
         let proxy = reqwest::Proxy::all(proxy_url)
@@ -41,6 +35,14 @@ impl Ubisoft {
             .build()
             .context("Failed to create HTTP client!")?;
 
+        Ok(Self {
+            token,
+            headers: HeaderMap::new(),
+            client
+        })
+    }
+    pub async fn login ( &mut self ) -> Result<()> {
+
         let auth_header = format!("Basic {}", self.token);
         println!("Using auth header: {}", auth_header.green());
 
@@ -49,9 +51,8 @@ impl Ubisoft {
         self.headers.insert("Content-Type", "application/json; charset=UTF-8".parse()?);
         self.headers.insert("Ubi-AppId", "4391c956-8943-48eb-8859-07b0778f47b9".parse()?);
         self.headers.insert("Ubi-LocaleCode", "en-us".parse()?);
-        
 
-        let request = client.post("https://public-ubiservices.ubi.com/v2/profiles/sessions")
+        let request = self.client.post("https://public-ubiservices.ubi.com/v2/profiles/sessions")
             .headers(self.headers.clone())
             .body("{\"rememberMe\": true}");
         
@@ -90,16 +91,7 @@ impl Ubisoft {
     }
 
     pub async fn basic_request ( &mut self, url: String ) -> Result<Value> {
-        let proxy_url = std::env::var("PROXY_URL")
-            .context("Couldn't find proxy URL in environment! Be sure to set `PROXY_URL`.")?;
-        let proxy = reqwest::Proxy::all(proxy_url)
-            .context("Failed to create proxy!")?;
-        let client = reqwest::Client::builder()
-            .proxy(proxy)
-            .build()
-            .context("Failed to create HTTP client!")?;
-
-        let request = client.get(&url)
+        let request = self.client.get(&url)
             .headers(self.headers.clone());
         
         match 
@@ -123,19 +115,10 @@ impl Ubisoft {
         }
     }
     pub async fn graphql_request ( &mut self, url: String, body: String ) -> Result<Value> {
-        let proxy_url = std::env::var("PROXY_URL")
-            .context("Couldn't find proxy URL in environment! Be sure to set `PROXY_URL`.")?;
-        let proxy = reqwest::Proxy::all(proxy_url)
-            .context("Failed to create proxy!")?;
-        let client = reqwest::Client::builder()
-            .proxy(proxy)
-            .build()
-            .context("Failed to create HTTP client!")?;
-
         let mut headers_with_new_locale = self.headers.clone();
         headers_with_new_locale.insert("Ubi-LocaleCode", "en-US".parse()?);
 
-        let request = client.post(&url)
+        let request = self.client.post(&url)
             .headers(headers_with_new_locale)
             .body(body);
 
