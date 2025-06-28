@@ -41,7 +41,10 @@ impl Ubisoft {
             .build()
             .context("Failed to create HTTP client!")?;
 
-        self.headers.insert("Authorization", format!("Basic {}", self.token).parse()?);
+        let auth_header = format!("Basic {}", self.token);
+        println!("Using auth header: {}", auth_header.green());
+
+        self.headers.insert("Authorization", auth_header.parse()?);
         self.headers.insert("User-Agent", "UbiServices_SDK_2020.Release.58_PC64_ansi_static".parse()?);
         self.headers.insert("Content-Type", "application/json; charset=UTF-8".parse()?);
         self.headers.insert("Ubi-AppId", "4391c956-8943-48eb-8859-07b0778f47b9".parse()?);

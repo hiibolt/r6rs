@@ -1,7 +1,7 @@
 use super::{bot::Sendable, lib::{get_random_anime_girl, AsyncFnPtr}};
 use crate::{helper::bot::BackendHandles, info};
 
-use std::{collections::{HashMap, VecDeque}, sync::Arc};
+use std::{collections::{BTreeMap, VecDeque}, sync::Arc};
 
 use anyhow::{Result, anyhow, bail};
 use async_recursion::async_recursion;
@@ -16,7 +16,7 @@ pub struct R6RSLeafCommand {
     pub valid_args: Vec<Vec<String>>
 }
 pub struct R6RSRootCommand {
-    pub commands: HashMap<String, Box<R6RSCommand>>,
+    pub commands: BTreeMap<String, Box<R6RSCommand>>,
     pub section_title: String
 }
 pub enum R6RSCommandType {
@@ -34,7 +34,7 @@ impl R6RSCommand {
         section_title: String
     ) -> R6RSCommand {
         R6RSCommand {
-            inner: R6RSCommandType::RootCommand(R6RSRootCommand{ commands: HashMap::new(), section_title }),
+            inner: R6RSCommandType::RootCommand(R6RSRootCommand{ commands: BTreeMap::new(), section_title }),
             description
         }
     }
